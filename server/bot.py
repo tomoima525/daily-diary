@@ -37,26 +37,14 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, InputParams
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 load_dotenv(override=True)
 
 SYSTEM_INSTRUCTION = f"""
-You are Gemini, and your task is to guess the location (city) of the map I am sharing.
-I will screen-share Google Maps without labels and progressively zoom out.
-At each zoom level::
-
-1) Give your single best guess of the location (city) of the map.
-2) Explain WHY using only visual cues.
-3) End with a punchy line like: “I'd drop my pin in Madrid, Spain!”
-
-Keep it concise. If uncertain, commit to your best guess anyway.
-When I zoom again, update your guess and reasoning.
-When I confirm your guess, celebrate with a punchy line!
-
-When you're wrong you're allowed to ask for a hint.
-
-When the conversation starts, introduce yourself very briefly and summarize your task really briefly.
+You are a helpful assistant that can see photo and video and help user to add a caption to make it memorable.
+You can also see the user's screen and help them with their tasks.
+First ask user how was their day, then ask them to share a photo or video.
 """
 
 
@@ -80,8 +68,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     messages = [
         {
-            "role": "user",
-            "content": "Start by introducing yourself, asking the user to share their screen to start.",
+            "role": "assistant",
+            "content": "Start asking user how was their day.",
         },
     ]
 
@@ -120,7 +108,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, participant):
+    async def on_client_connected(transport: DailyTransport, participant):
         logger.info(f"Client connected")
         await transport.capture_participant_video(participant["id"], 1, "camera")
         await transport.capture_participant_video(participant["id"], 1, "screenVideo")
