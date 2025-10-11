@@ -61,6 +61,13 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
     }
   };
 
+  const handleButtonClick = () => {
+    if (!uploading) {
+      const input = document.getElementById('photo-upload') as HTMLInputElement;
+      input?.click();
+    }
+  };
+
   return (
     <div className="relative">
       <input
@@ -71,12 +78,10 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
         id="photo-upload"
         disabled={uploading}
       />
-      <label htmlFor="photo-upload">
-        <Button as="span" disabled={uploading}>
-          <Upload className="w-4 h-4 mr-2" />
-          {uploading ? "Uploading..." : "Upload Photo"}
-        </Button>
-      </label>
+      <Button onClick={handleButtonClick} disabled={uploading}>
+        <Upload className="w-4 h-4 mr-2" />
+        {uploading ? "Uploading..." : "Upload Photo"}
+      </Button>
     </div>
   );
 }
