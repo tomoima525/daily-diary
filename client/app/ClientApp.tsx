@@ -27,6 +27,8 @@ import {
 import React, { useEffect, useState } from "react";
 import { Logs, MonitorOff } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
+import { PhotoUpload } from './components/PhotoUpload';
+import { VideoDisplay } from './components/VideoDisplay';
 import Image from "next/image";
 
 interface Props {
@@ -46,6 +48,7 @@ export const ClientApp: React.FC<Props> = ({
   const { isCamEnabled } = usePipecatClientCamControl();
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (hasDisconnected) return;
@@ -74,6 +77,13 @@ export const ClientApp: React.FC<Props> = ({
       url: "https://www.google.com",
     });
     setShowLogs((prev) => !prev);
+  };
+
+  const handlePhotoUpload = (url: string) => {
+    client?.sendClientMessage('photo_uploaded', {
+      type: 'photo_upload',
+      url: url,
+    });
   };
 
   if (!client) {
@@ -147,11 +157,16 @@ export const ClientApp: React.FC<Props> = ({
                     <PanelTitle>Conversation</PanelTitle>
                   </PanelHeader>
                   <PanelContent className="h-full p-0! min-h-0">
-                    <Conversation
-                      assistantLabel="Gemini"
-                      clientLabel="You"
-                      textMode="tts"
-                    />
+                    <div className="flex flex-col h-full">
+                      <div className="flex-1">
+                        <Conversation
+                          assistantLabel="Gemini"
+                          clientLabel="You"
+                          textMode="tts"
+                        />
+                      </div>
+                      <VideoDisplay videoUrl={videoUrl} />
+                    </div>
                   </PanelContent>
                 </Panel>
               </div>
@@ -168,11 +183,16 @@ export const ClientApp: React.FC<Props> = ({
                         <PanelTitle>Conversation</PanelTitle>
                       </PanelHeader>
                       <PanelContent className="h-full p-0! min-h-0">
-                        <Conversation
-                          assistantLabel="Gemini"
-                          clientLabel="You"
-                          textMode="tts"
-                        />
+                        <div className="flex flex-col h-full">
+                          <div className="flex-1">
+                            <Conversation
+                              assistantLabel="Gemini"
+                              clientLabel="You"
+                              textMode="tts"
+                            />
+                          </div>
+                          <VideoDisplay videoUrl={videoUrl} />
+                        </div>
                       </PanelContent>
                     </Panel>
                   </ResizablePanel>
@@ -195,6 +215,7 @@ export const ClientApp: React.FC<Props> = ({
                 <UserAudioControl visualizerProps={{ barCount: 5 }} />
                 <UserVideoControl noVideo />
                 {!isMobile && <UserScreenControl noScreen />}
+                <PhotoUpload onUpload={handlePhotoUpload} />
               </CardContent>
             </Card>
           </div>
