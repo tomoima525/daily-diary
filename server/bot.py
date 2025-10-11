@@ -21,23 +21,31 @@ import os
 from typing import Optional
 
 from dotenv import load_dotenv
-from PIL import Image
 from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import Frame, LLMRunFrame
+from pipecat.frames.frames import (
+    Frame,
+    LLMRunFrame,
+    OutputTransportMessageUrgentFrame,
+    TTSTextFrame,
+)
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.openai_llm_context import (
+    OpenAILLMContext,
+    OpenAILLMContextFrame,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import (
     RTVIClientMessageFrame,
     RTVIConfig,
     RTVIObserver,
     RTVIProcessor,
+    RTVIServerMessage,
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -45,6 +53,7 @@ from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, InputP
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
+from image_analyzer import ImageAnalyzer
 from s3_manager import S3PhotoManager
 
 load_dotenv(override=True)
@@ -59,7 +68,9 @@ class ReceiveUserMessage(FrameProcessor):
         super().__init__()
         self._user_messages = []
         self._s3_manager = S3PhotoManager()
+        self._image_analyzer = ImageAnalyzer()
         self._downloaded_images = []
+        self._image_analyses = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -73,20 +84,38 @@ class ReceiveUserMessage(FrameProcessor):
         # Store user message and handle photo downloads
         if isinstance(frame, RTVIClientMessageFrame):
             logger.info(f"User message: {frame.data}")
-            # User message: {'type': 'client_message', 'file_url': 'photo123.jpg'}
-            self._user_messages.append(frame.data)
-            
             # Check if this is a photo upload message
-            if isinstance(frame.data, dict) and frame.data.get('type') == 'client_message':
-                file_url = frame.data.get('file_url')
-                if file_url:
-                    await self._handle_photo_download(file_url)
+            if isinstance(frame.data, dict) and frame.data.get("type") == "client_message":
+                # First push message that you see the file is uploaded
+                frame = TTSTextFrame(text="I see the file is uploaded. Let me analyze it.")
 
-        await self.push_frame(frame, direction)
+                await self.push_frame(
+                    frame,
+                    # OutputTransportMessageUrgentFrame(message=bot_check_photo_message.model_dump()),
+                    direction,
+                )
+                file_url = frame.data.get("file_url")
+                if file_url:
+                    message = await self._handle_photo_download(file_url)
+                    # Create a dictionary using the file_url as key and message as value
+                    user_message = {}
+                    user_message[file_url] = {"content": message}
+                    self._user_messages.append(user_message)
+                    bot_message = RTVIServerMessage(
+                        data={
+                            "type": "bot_llm_text",
+                            "data": {"text": message},
+                        }
+                    )
+                    new_frame = OutputTransportMessageUrgentFrame(message=bot_message.model_dump())
+                    await self.push_frame(new_frame, direction)
+
+        else:
+            await self.push_frame(frame, direction)
 
     async def _handle_photo_download(self, file_key: str):
         """Handle downloading a photo from S3 when user uploads one.
-        
+
         Args:
             file_key: The S3 object key for the uploaded photo
         """
@@ -94,34 +123,68 @@ class ReceiveUserMessage(FrameProcessor):
             # Download the image
             image = await self._s3_manager.download_image(file_key)
             if image:
-                self._downloaded_images.append({
-                    'file_key': file_key,
-                    'image': image,
-                    'size': image.size,
-                    'format': image.format
-                })
+                # Store downloaded image
+                image_data = {
+                    "file_key": file_key,
+                    "image": image,
+                    "size": image.size,
+                    "format": image.format,
+                }
+                self._downloaded_images.append(image_data)
                 logger.info(f"Successfully processed photo: {file_key} ({image.size})")
-                
-                # Generate presigned URL for potential future access
-                presigned_url = await self._s3_manager.generate_presigned_url(file_key)
-                if presigned_url:
-                    logger.info(f"Presigned URL available for {file_key}")
+
+                # Analyze the image with Gemini
+                logger.info(f"Starting image analysis for {file_key}")
+                analysis_response = await self._image_analyzer.analyze_and_respond(image, file_key)
+
+                if analysis_response:
+                    # Store the analysis
+                    analysis_data = {
+                        "file_key": file_key,
+                        "response": analysis_response,
+                        "timestamp": self._image_analyzer.genai_model.__class__.__name__,
+                    }
+                    self._image_analyses.append(analysis_data)
+
+                    logger.info(f"Image analysis completed for {file_key}")
+                    # Note: The analysis response will be handled by the conversation flow
+                    # The Gemini Live model should pick up on the image context
+                else:
+                    # Use fallback response
+                    fallback_response = self._image_analyzer.get_fallback_response()
+                    analysis_data = {
+                        "file_key": file_key,
+                        "response": fallback_response,
+                        "timestamp": "fallback",
+                    }
+                    self._image_analyses.append(analysis_data)
+                    logger.warning(f"Used fallback response for {file_key}")
+                return analysis_response
             else:
                 logger.error(f"Failed to download photo: {file_key}")
-                
+                return None
         except Exception as e:
             logger.error(f"Error handling photo download for {file_key}: {e}")
-    
+            return None
+
     def get_user_messages(self):
         return self._user_messages
-    
+
     def get_downloaded_images(self):
         """Get list of successfully downloaded images."""
         return self._downloaded_images
-    
+
     def get_latest_image(self) -> Optional[dict]:
         """Get the most recently downloaded image."""
         return self._downloaded_images[-1] if self._downloaded_images else None
+
+    def get_image_analyses(self):
+        """Get list of image analyses."""
+        return self._image_analyses
+
+    def get_latest_analysis(self) -> Optional[dict]:
+        """Get the most recent image analysis."""
+        return self._image_analyses[-1] if self._image_analyses else None
 
 
 SYSTEM_INSTRUCTION = f"""
@@ -158,7 +221,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     messages = [
         {
-            "role": "user",
+            "role": "system",
             "content": "Hi! Welcome to Daily Diary. How was your day today?",
         },
     ]
@@ -197,6 +260,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
         # Start the conversation with initial message
+
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
