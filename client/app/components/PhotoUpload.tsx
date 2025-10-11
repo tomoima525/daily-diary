@@ -11,6 +11,12 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      console.error("Please select an image file");
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -20,12 +26,20 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ filename: file.name }),
+        body: JSON.stringify({ 
+          filename: file.name,
+          contentType: file.type 
+        }),
       });
-      const { uploadUrl, fileUrl } = await response.json();
 
-      // Upload to S3
-      await fetch(uploadUrl, {
+      if (!response.ok) {
+        throw new Error(`Upload preparation failed: ${response.status}`);
+      }
+
+      const { uploadUrl, fileUrl, key } = await response.json();
+
+      // Upload file to S3 using presigned URL
+      const uploadResponse = await fetch(uploadUrl, {
         method: "PUT",
         body: file,
         headers: {
@@ -33,9 +47,15 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
         },
       });
 
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload to S3 failed: ${uploadResponse.status}`);
+      }
+
+      console.log(`File uploaded successfully: ${key}`);
       onUpload(fileUrl);
     } catch (error) {
       console.error("Upload failed:", error);
+      // You could add user-facing error handling here
     } finally {
       setUploading(false);
     }
