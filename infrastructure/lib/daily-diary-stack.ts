@@ -31,8 +31,20 @@ export class DailyDiaryStack extends cdk.Stack {
         ignorePublicAcls: false,
         restrictPublicBuckets: false,
       },
+      publicReadAccess: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For hackathon - use RETAIN in production
     });
+
+    // Add bucket policy to allow public read access to photos
+    bucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        sid: "AllowPublicReadAccess",
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.AnyPrincipal()],
+        actions: ["s3:GetObject"],
+        resources: [`${bucket.bucketArn}/*`],
+      })
+    );
 
     // CloudFront distribution for faster access
     const distribution = new cloudfront.Distribution(
