@@ -116,6 +116,13 @@ export const ClientApp: React.FC<Props> = ({
     });
   };
 
+  const handleUploadComplete = (fileKey: string) => {
+    client?.sendClientMessage('upload_complete', {
+      type: 'client_message',
+      file_url: fileKey,
+    });
+  };
+
   if (!client) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -245,7 +252,11 @@ export const ClientApp: React.FC<Props> = ({
                 <UserAudioControl visualizerProps={{ barCount: 5 }} />
                 <UserVideoControl noVideo />
                 {!isMobile && <UserScreenControl noScreen />}
-                <PhotoUpload onUpload={handlePhotoUpload} roomId={roomId} />
+                <PhotoUpload 
+                  onUpload={handlePhotoUpload} 
+                  onUploadComplete={handleUploadComplete}
+                  roomId={roomId} 
+                />
               </CardContent>
             </Card>
           </div>

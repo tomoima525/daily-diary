@@ -6,10 +6,11 @@ import { Button } from "@pipecat-ai/voice-ui-kit";
 
 interface PhotoUploadProps {
   onUpload: (url: string) => void;
+  onUploadComplete?: (fileKey: string) => void;
   roomId: string | null;
 }
 
-export function PhotoUpload({ onUpload, roomId }: PhotoUploadProps) {
+export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +61,11 @@ export function PhotoUpload({ onUpload, roomId }: PhotoUploadProps) {
 
       console.log(`File uploaded successfully: ${key}`);
       onUpload(fileUrl);
+      
+      // Notify agent that upload is complete
+      if (onUploadComplete) {
+        onUploadComplete(key);
+      }
     } catch (error) {
       console.error("Upload failed:", error);
       // You could add user-facing error handling here
