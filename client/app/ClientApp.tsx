@@ -27,6 +27,8 @@ import {
 import React, { useEffect, useState } from "react";
 import { Logs, MonitorOff } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
+import { PhotoUpload } from './components/PhotoUpload';
+import { VideoDisplay } from './components/VideoDisplay';
 import Image from "next/image";
 
 interface Props {
@@ -46,6 +48,8 @@ export const ClientApp: React.FC<Props> = ({
   const { isCamEnabled } = usePipecatClientCamControl();
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (hasDisconnected) return;
@@ -53,6 +57,34 @@ export const ClientApp: React.FC<Props> = ({
       client.initDevices();
     }
   }, [client, hasDisconnected, isDisconnected]);
+
+  // Capture room ID when client connects
+  useEffect(() => {
+    if (!client) return;
+
+    const handleConnected = () => {
+      // Access the Daily transport to get room information
+      const transport = client.transport as { dailyCallObject?: { room?: () => { domainName?: string; name?: string } } };
+      if (transport && transport.dailyCallObject) {
+        const callObject = transport.dailyCallObject;
+        if (callObject.room) {
+          const roomInfo = callObject.room();
+          const dailyRoomUrl = roomInfo.domainName || roomInfo.name || '';
+          // Extract room ID from URL or use full room name
+          const extractedRoomId = dailyRoomUrl.split('/').pop() || dailyRoomUrl;
+          setRoomId(extractedRoomId);
+          console.log('Daily room ID captured:', extractedRoomId);
+        }
+      }
+    };
+
+    // Listen for connection events
+    client.on('connected', handleConnected);
+    
+    return () => {
+      client.off('connected', handleConnected);
+    };
+  }, [client]);
 
   const handleConnect = async () => {
     try {
@@ -74,6 +106,14 @@ export const ClientApp: React.FC<Props> = ({
       url: "https://www.google.com",
     });
     setShowLogs((prev) => !prev);
+  };
+
+  const handlePhotoUpload = (url: string) => {
+    client?.sendClientMessage('photo_uploaded', {
+      type: 'photo_upload',
+      url: url,
+      roomId: roomId,
+    });
   };
 
   if (!client) {
@@ -147,11 +187,16 @@ export const ClientApp: React.FC<Props> = ({
                     <PanelTitle>Conversation</PanelTitle>
                   </PanelHeader>
                   <PanelContent className="h-full p-0! min-h-0">
-                    <Conversation
-                      assistantLabel="Gemini"
-                      clientLabel="You"
-                      textMode="tts"
-                    />
+                    <div className="flex flex-col h-full">
+                      <div className="flex-1">
+                        <Conversation
+                          assistantLabel="Gemini"
+                          clientLabel="You"
+                          textMode="tts"
+                        />
+                      </div>
+                      <VideoDisplay videoUrl={videoUrl} />
+                    </div>
                   </PanelContent>
                 </Panel>
               </div>
@@ -168,11 +213,16 @@ export const ClientApp: React.FC<Props> = ({
                         <PanelTitle>Conversation</PanelTitle>
                       </PanelHeader>
                       <PanelContent className="h-full p-0! min-h-0">
-                        <Conversation
-                          assistantLabel="Gemini"
-                          clientLabel="You"
-                          textMode="tts"
-                        />
+                        <div className="flex flex-col h-full">
+                          <div className="flex-1">
+                            <Conversation
+                              assistantLabel="Gemini"
+                              clientLabel="You"
+                              textMode="tts"
+                            />
+                          </div>
+                          <VideoDisplay videoUrl={videoUrl} />
+                        </div>
                       </PanelContent>
                     </Panel>
                   </ResizablePanel>
@@ -195,6 +245,7 @@ export const ClientApp: React.FC<Props> = ({
                 <UserAudioControl visualizerProps={{ barCount: 5 }} />
                 <UserVideoControl noVideo />
                 {!isMobile && <UserScreenControl noScreen />}
+                <PhotoUpload onUpload={handlePhotoUpload} roomId={roomId} />
               </CardContent>
             </Card>
           </div>

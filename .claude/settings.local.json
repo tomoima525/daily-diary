@@ -2,6 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:ai.google.dev)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
       "Bash(npm install)",
       "Bash(npm run build:*)",
       "Bash(npx cdk bootstrap:*)",

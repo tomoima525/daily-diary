@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.908.0",
+    "@aws-sdk/s3-request-presigner": "^3.908.0",
     "@pipecat-ai/client-js": "^1.4.0",
     "@pipecat-ai/client-react": "^1.0.1",
     "@pipecat-ai/daily-transport": "^1.4.1",
