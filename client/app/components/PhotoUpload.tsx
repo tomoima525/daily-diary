@@ -4,7 +4,12 @@ import { useState } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@pipecat-ai/voice-ui-kit";
 
-export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
+interface PhotoUploadProps {
+  onUpload: (url: string) => void;
+  roomId: string | null;
+}
+
+export function PhotoUpload({ onUpload, roomId }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,6 +23,7 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
     }
 
     setUploading(true);
+    console.log('Uploading file with room ID:', roomId);
 
     try {
       // Get presigned URL from server
@@ -28,7 +34,8 @@ export function PhotoUpload({ onUpload }: { onUpload: (url: string) => void }) {
         },
         body: JSON.stringify({ 
           filename: file.name,
-          contentType: file.type 
+          contentType: file.type,
+          roomId: roomId
         }),
       });
 

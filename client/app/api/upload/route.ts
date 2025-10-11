@@ -13,7 +13,7 @@ const s3Client = new S3Client({
 
 export async function POST(request: NextRequest) {
   try {
-    const { filename, contentType } = await request.json();
+    const { filename, contentType, roomId } = await request.json();
 
     if (!filename) {
       return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
@@ -28,9 +28,10 @@ export async function POST(request: NextRequest) {
       hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
     });
 
-    // Generate unique filename with timestamp
+    // Generate unique filename with timestamp and room-based organization
     const timestamp = Date.now();
-    const uniqueFilename = `photos/${timestamp}-${filename}`;
+    const folderPath = roomId ? `rooms/${roomId}/photos` : 'photos';
+    const uniqueFilename = `${folderPath}/${timestamp}-${filename}`;
 
     const bucketName = process.env.S3_BUCKET_NAME || 'daily-diary-storage-bucket';
     const region = process.env.AWS_REGION || 'us-east-1';
@@ -52,12 +53,13 @@ export async function POST(request: NextRequest) {
     const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${uniqueFilename}`;
 
     console.log('Generated presigned URL successfully for:', uniqueFilename);
+    console.log('Using room-based folder:', folderPath);
 
     return NextResponse.json({
       uploadUrl,
       fileUrl,
       key: uniqueFilename,
-      debug: process.env.NODE_ENV === 'development' ? { region, bucket: bucketName } : undefined,
+      debug: process.env.NODE_ENV === 'development' ? { region, bucket: bucketName, roomId, folderPath } : undefined,
     });
   } catch (error) {
     console.error('Upload API error:', error);

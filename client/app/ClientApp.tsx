@@ -49,6 +49,7 @@ export const ClientApp: React.FC<Props> = ({
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (hasDisconnected) return;
@@ -56,6 +57,34 @@ export const ClientApp: React.FC<Props> = ({
       client.initDevices();
     }
   }, [client, hasDisconnected, isDisconnected]);
+
+  // Capture room ID when client connects
+  useEffect(() => {
+    if (!client) return;
+
+    const handleConnected = () => {
+      // Access the Daily transport to get room information
+      const transport = client.transport as { dailyCallObject?: { room?: () => { domainName?: string; name?: string } } };
+      if (transport && transport.dailyCallObject) {
+        const callObject = transport.dailyCallObject;
+        if (callObject.room) {
+          const roomInfo = callObject.room();
+          const dailyRoomUrl = roomInfo.domainName || roomInfo.name || '';
+          // Extract room ID from URL or use full room name
+          const extractedRoomId = dailyRoomUrl.split('/').pop() || dailyRoomUrl;
+          setRoomId(extractedRoomId);
+          console.log('Daily room ID captured:', extractedRoomId);
+        }
+      }
+    };
+
+    // Listen for connection events
+    client.on('connected', handleConnected);
+    
+    return () => {
+      client.off('connected', handleConnected);
+    };
+  }, [client]);
 
   const handleConnect = async () => {
     try {
@@ -83,6 +112,7 @@ export const ClientApp: React.FC<Props> = ({
     client?.sendClientMessage('photo_uploaded', {
       type: 'photo_upload',
       url: url,
+      roomId: roomId,
     });
   };
 
@@ -215,7 +245,7 @@ export const ClientApp: React.FC<Props> = ({
                 <UserAudioControl visualizerProps={{ barCount: 5 }} />
                 <UserVideoControl noVideo />
                 {!isMobile && <UserScreenControl noScreen />}
-                <PhotoUpload onUpload={handlePhotoUpload} />
+                <PhotoUpload onUpload={handlePhotoUpload} roomId={roomId} />
               </CardContent>
             </Card>
           </div>
