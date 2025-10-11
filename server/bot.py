@@ -18,8 +18,10 @@ the conversation flow using Gemini's streaming capabilities.
 """
 
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
+from PIL import Image
 from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -43,17 +45,21 @@ from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, InputP
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
+from s3_manager import S3PhotoManager
+
 load_dotenv(override=True)
 
 
 class ReceiveUserMessage(FrameProcessor):
     """
-    Receive user message and store it
+    Receive user message and handle photo downloads from S3
     """
 
     def __init__(self):
         super().__init__()
         self._user_messages = []
+        self._s3_manager = S3PhotoManager()
+        self._downloaded_images = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -64,16 +70,58 @@ class ReceiveUserMessage(FrameProcessor):
         """
         await super().process_frame(frame, direction)
 
-        # Store user message when bot starts speaking
+        # Store user message and handle photo downloads
         if isinstance(frame, RTVIClientMessageFrame):
             logger.info(f"User message: {frame.data}")
-            # User message: {'type': 'client_message', 'url': 'https://www.google.com'}
+            # User message: {'type': 'client_message', 'file_url': 'photo123.jpg'}
             self._user_messages.append(frame.data)
+            
+            # Check if this is a photo upload message
+            if isinstance(frame.data, dict) and frame.data.get('type') == 'client_message':
+                file_url = frame.data.get('file_url')
+                if file_url:
+                    await self._handle_photo_download(file_url)
 
         await self.push_frame(frame, direction)
 
+    async def _handle_photo_download(self, file_key: str):
+        """Handle downloading a photo from S3 when user uploads one.
+        
+        Args:
+            file_key: The S3 object key for the uploaded photo
+        """
+        try:
+            # Download the image
+            image = await self._s3_manager.download_image(file_key)
+            if image:
+                self._downloaded_images.append({
+                    'file_key': file_key,
+                    'image': image,
+                    'size': image.size,
+                    'format': image.format
+                })
+                logger.info(f"Successfully processed photo: {file_key} ({image.size})")
+                
+                # Generate presigned URL for potential future access
+                presigned_url = await self._s3_manager.generate_presigned_url(file_key)
+                if presigned_url:
+                    logger.info(f"Presigned URL available for {file_key}")
+            else:
+                logger.error(f"Failed to download photo: {file_key}")
+                
+        except Exception as e:
+            logger.error(f"Error handling photo download for {file_key}: {e}")
+    
     def get_user_messages(self):
         return self._user_messages
+    
+    def get_downloaded_images(self):
+        """Get list of successfully downloaded images."""
+        return self._downloaded_images
+    
+    def get_latest_image(self) -> Optional[dict]:
+        """Get the most recently downloaded image."""
+        return self._downloaded_images[-1] if self._downloaded_images else None
 
 
 SYSTEM_INSTRUCTION = f"""
