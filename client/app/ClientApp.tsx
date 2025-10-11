@@ -29,6 +29,7 @@ import { Logs, MonitorOff } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
 import { PhotoUpload } from './components/PhotoUpload';
 import { VideoDisplay } from './components/VideoDisplay';
+import { PhotoDisplay } from './components/PhotoDisplay';
 import Image from "next/image";
 
 interface Props {
@@ -50,6 +51,7 @@ export const ClientApp: React.FC<Props> = ({
   const [hasDisconnected, setHasDisconnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (hasDisconnected) return;
@@ -109,6 +111,7 @@ export const ClientApp: React.FC<Props> = ({
   };
 
   const handlePhotoUpload = (url: string) => {
+    setUploadedPhotoUrl(url);
     client?.sendClientMessage('photo_uploaded', {
       type: 'photo_upload',
       url: url,
@@ -189,32 +192,8 @@ export const ClientApp: React.FC<Props> = ({
             <ResizablePanel defaultSize={70} minSize={40}>
               {/* Small screens: resizable split between conversation and screenshare */}
               <div className="lg:hidden! h-full">
-                <Panel className="h-full">
-                  <PanelHeader>
-                    <PanelTitle>Conversation</PanelTitle>
-                  </PanelHeader>
-                  <PanelContent className="h-full p-0! min-h-0">
-                    <div className="flex flex-col h-full">
-                      <div className="flex-1">
-                        <Conversation
-                          assistantLabel="Gemini"
-                          clientLabel="You"
-                          textMode="tts"
-                        />
-                      </div>
-                      <VideoDisplay videoUrl={videoUrl} />
-                    </div>
-                  </PanelContent>
-                </Panel>
-              </div>
-
-              {/* Large screens: resizable split between conversation and screenshare */}
-              <div className="hidden lg:block! h-full">
-                <ResizablePanelGroup
-                  direction="horizontal"
-                  className="h-full gap-2"
-                >
-                  <ResizablePanel defaultSize={100} minSize={30}>
+                <ResizablePanelGroup direction="horizontal" className="h-full gap-2">
+                  <ResizablePanel defaultSize={uploadedPhotoUrl ? 60 : 100} minSize={40}>
                     <Panel className="h-full">
                       <PanelHeader>
                         <PanelTitle>Conversation</PanelTitle>
@@ -233,6 +212,70 @@ export const ClientApp: React.FC<Props> = ({
                       </PanelContent>
                     </Panel>
                   </ResizablePanel>
+                  {uploadedPhotoUrl && (
+                    <>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel defaultSize={40} minSize={30} maxSize={60}>
+                        <Panel className="h-full">
+                          <PanelHeader>
+                            <PanelTitle>Photo</PanelTitle>
+                          </PanelHeader>
+                          <PanelContent className="h-full p-2 flex items-center justify-center">
+                            <PhotoDisplay 
+                              photoUrl={uploadedPhotoUrl} 
+                              onClear={() => setUploadedPhotoUrl(null)}
+                            />
+                          </PanelContent>
+                        </Panel>
+                      </ResizablePanel>
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </div>
+
+              {/* Large screens: resizable split between conversation and screenshare */}
+              <div className="hidden lg:block! h-full">
+                <ResizablePanelGroup
+                  direction="horizontal"
+                  className="h-full gap-2"
+                >
+                  <ResizablePanel defaultSize={uploadedPhotoUrl ? 65 : 100} minSize={30}>
+                    <Panel className="h-full">
+                      <PanelHeader>
+                        <PanelTitle>Conversation</PanelTitle>
+                      </PanelHeader>
+                      <PanelContent className="h-full p-0! min-h-0">
+                        <div className="flex flex-col h-full">
+                          <div className="flex-1">
+                            <Conversation
+                              assistantLabel="Gemini"
+                              clientLabel="You"
+                              textMode="tts"
+                            />
+                          </div>
+                          <VideoDisplay videoUrl={videoUrl} />
+                        </div>
+                      </PanelContent>
+                    </Panel>
+                  </ResizablePanel>
+                  {uploadedPhotoUrl && (
+                    <>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                        <Panel className="h-full">
+                          <PanelHeader>
+                            <PanelTitle>Uploaded Photo</PanelTitle>
+                          </PanelHeader>
+                          <PanelContent className="h-full p-4 flex items-center justify-center">
+                            <PhotoDisplay 
+                              photoUrl={uploadedPhotoUrl} 
+                              onClear={() => setUploadedPhotoUrl(null)}
+                            />
+                          </PanelContent>
+                        </Panel>
+                      </ResizablePanel>
+                    </>
+                  )}
                 </ResizablePanelGroup>
               </div>
             </ResizablePanel>
