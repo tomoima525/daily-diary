@@ -25,14 +25,18 @@ from loguru import logger
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import (
-    LLMRunFrame,
-)
+from pipecat.frames.frames import Frame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.processors.frameworks.rtvi import (
+    RTVIClientMessageFrame,
+    RTVIConfig,
+    RTVIObserver,
+    RTVIProcessor,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, InputParams
@@ -40,6 +44,37 @@ from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 load_dotenv(override=True)
+
+
+class ReceiveUserMessage(FrameProcessor):
+    """
+    Receive user message and store it
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._user_messages = []
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        """Process incoming frames and store user message.
+
+        Args:
+            frame: The incoming frame to process
+            direction: The direction of frame flow in the pipeline
+        """
+        await super().process_frame(frame, direction)
+
+        # Store user message when bot starts speaking
+        if isinstance(frame, RTVIClientMessageFrame):
+            logger.info(f"User message: {frame.data}")
+            # User message: {'type': 'client_message', 'url': 'https://www.google.com'}
+            self._user_messages.append(frame.data)
+
+        await self.push_frame(frame, direction)
+
+    def get_user_messages(self):
+        return self._user_messages
+
 
 SYSTEM_INSTRUCTION = f"""
 You are a helpful assistant that can see photo and video and help user to add a caption to make it memorable.
@@ -68,7 +103,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     messages = [
         {
-            "role": "assistant",
+            "role": "user",
             "content": "Start asking user how was their day.",
         },
     ]
@@ -80,6 +115,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # RTVI events for Pipecat client UI
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    receive_user_message = ReceiveUserMessage()
 
     pipeline = Pipeline(
         [
@@ -87,6 +123,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             rtvi,
             context_aggregator.user(),
             llm,
+            receive_user_message,
             transport.output(),
             context_aggregator.assistant(),
         ]
@@ -110,8 +147,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport: DailyTransport, participant):
         logger.info(f"Client connected")
-        await transport.capture_participant_video(participant["id"], 1, "camera")
-        await transport.capture_participant_video(participant["id"], 1, "screenVideo")
+
+    #     await transport.capture_participant_video(participant["id"], 1, "camera")
+
+    #   await transport.capture_participant_video(participant["id"], 1, "screenVideo")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

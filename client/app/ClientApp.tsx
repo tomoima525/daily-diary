@@ -4,7 +4,6 @@ import {
   PipecatClientVideo,
   usePipecatClient,
   usePipecatClientCamControl,
-  usePipecatClientScreenShareControl,
 } from "@pipecat-ai/client-react";
 import {
   Button,
@@ -45,7 +44,6 @@ export const ClientApp: React.FC<Props> = ({
 
   const { isDisconnected } = usePipecatConnectionState();
   const { isCamEnabled } = usePipecatClientCamControl();
-  const { isScreenShareEnabled } = usePipecatClientScreenShareControl();
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
 
@@ -71,6 +69,10 @@ export const ClientApp: React.FC<Props> = ({
 
   const [showLogs, setShowLogs] = useState(false);
   const handleToggleLogs = () => {
+    client?.sendClientMessage("Test message", {
+      type: "client_message",
+      url: "https://www.google.com",
+    });
     setShowLogs((prev) => !prev);
   };
 
@@ -140,49 +142,18 @@ export const ClientApp: React.FC<Props> = ({
             <ResizablePanel defaultSize={70} minSize={40}>
               {/* Small screens: resizable split between conversation and screenshare */}
               <div className="lg:hidden! h-full">
-                {isScreenShareEnabled ? (
-                  <ResizablePanelGroup
-                    direction="vertical"
-                    className="h-full gap-2"
-                  >
-                    <ResizablePanel defaultSize={60} minSize={30}>
-                      <Panel className="h-full">
-                        <PanelHeader>
-                          <PanelTitle>Conversation</PanelTitle>
-                        </PanelHeader>
-                        <PanelContent className="h-full p-0! min-h-0">
-                          <Conversation
-                            assistantLabel="Gemini"
-                            clientLabel="You"
-                            textMode="tts"
-                          />
-                        </PanelContent>
-                      </Panel>
-                    </ResizablePanel>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={40} minSize={20}>
-                      <PipecatClientVideo
-                        className="h-full rounded-md w-full bg-white border overflow-hidden"
-                        fit="contain"
-                        participant="local"
-                        trackType="screenVideo"
-                      />
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
-                ) : (
-                  <Panel className="h-full">
-                    <PanelHeader>
-                      <PanelTitle>Conversation</PanelTitle>
-                    </PanelHeader>
-                    <PanelContent className="h-full p-0! min-h-0">
-                      <Conversation
-                        assistantLabel="Gemini"
-                        clientLabel="You"
-                        textMode="tts"
-                      />
-                    </PanelContent>
-                  </Panel>
-                )}
+                <Panel className="h-full">
+                  <PanelHeader>
+                    <PanelTitle>Conversation</PanelTitle>
+                  </PanelHeader>
+                  <PanelContent className="h-full p-0! min-h-0">
+                    <Conversation
+                      assistantLabel="Gemini"
+                      clientLabel="You"
+                      textMode="tts"
+                    />
+                  </PanelContent>
+                </Panel>
               </div>
 
               {/* Large screens: resizable split between conversation and screenshare */}
@@ -191,10 +162,7 @@ export const ClientApp: React.FC<Props> = ({
                   direction="horizontal"
                   className="h-full gap-2"
                 >
-                  <ResizablePanel
-                    defaultSize={isScreenShareEnabled ? 60 : 100}
-                    minSize={30}
-                  >
+                  <ResizablePanel defaultSize={100} minSize={30}>
                     <Panel className="h-full">
                       <PanelHeader>
                         <PanelTitle>Conversation</PanelTitle>
@@ -208,19 +176,6 @@ export const ClientApp: React.FC<Props> = ({
                       </PanelContent>
                     </Panel>
                   </ResizablePanel>
-                  {isScreenShareEnabled && (
-                    <>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={40} minSize={30}>
-                        <PipecatClientVideo
-                          className="h-full rounded-md w-full bg-white border overflow-hidden"
-                          fit="contain"
-                          participant="local"
-                          trackType="screenVideo"
-                        />
-                      </ResizablePanel>
-                    </>
-                  )}
                 </ResizablePanelGroup>
               </div>
             </ResizablePanel>
