@@ -21,7 +21,6 @@ import os
 from typing import Optional
 
 from dotenv import load_dotenv
-from google.genai.types import ThinkingConfig
 from loguru import logger
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -29,11 +28,6 @@ from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     Frame,
     InputTextRawFrame,
-    LLMMessagesAppendFrame,
-    LLMRunFrame,
-    OutputTransportMessageUrgentFrame,
-    TTSSpeakFrame,
-    TTSTextFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -48,12 +42,12 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIConfig,
     RTVIObserver,
     RTVIProcessor,
-    RTVIServerMessage,
-    RTVIServerMessageFrame,
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, InputParams
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -74,7 +68,6 @@ class ReceiveUserMessage(FrameProcessor):
         self._s3_manager = S3PhotoManager()
         self._image_analyzer = ImageAnalyzer()
         self._downloaded_images = []
-        self._image_analyses = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -88,7 +81,7 @@ class ReceiveUserMessage(FrameProcessor):
         # Store user message and handle photo downloads
         if isinstance(frame, RTVIClientMessageFrame):
             # Check if this is a photo upload message
-            if isinstance(frame.data, dict) and frame.data.get("type") == "client_message":
+            if isinstance(frame.data, dict) and frame.data.get("type") == "upload_message":
                 # LLMMessagesAppendFrame
                 # await self.push_frame(
                 #     LLMMessagesAppendFrame(messages=[
@@ -100,7 +93,7 @@ class ReceiveUserMessage(FrameProcessor):
                 #     direction=FrameDirection.UPSTREAM,
                 # )
                 await self.push_frame(
-                    InputTextRawFrame(text="Tell me a small joke while photo is uploading"),
+                    InputTextRawFrame(text="I'm uploading a photo now so that you can see it"),
                     direction=FrameDirection.UPSTREAM,
                 )
                 file_url = frame.data.get("file_url")
@@ -114,6 +107,22 @@ class ReceiveUserMessage(FrameProcessor):
                         InputTextRawFrame(text=message),
                         direction=FrameDirection.UPSTREAM,
                     )
+            if isinstance(frame.data, dict) and frame.data.get("type") == "photo_impression":
+                file_url = frame.data.get("file_url")
+                user_message = self._user_messages.get(file_url)
+                if user_message:
+                    message = user_message[file_url]["content"]
+                    user_message[file_url] = {
+                        "content": message,
+                        "impression": frame.data.get("impression"),
+                    }
+
+            if (
+                isinstance(frame.data, dict)
+                and frame.data.get("type") == "video_generation_request"
+            ):
+                # TODO: Handle video generation request
+                pass
 
         else:
             await self.push_frame(frame, direction)
@@ -215,14 +224,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     - RTVI event handling
     """
 
-    # Initialize the Gemini Multimodal Live model
-    llm = GeminiLiveLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        model="gemini-2.5-flash-native-audio-preview-09-2025",
-        voice_id="Charon",  # Aoede, Charon, Fenrir, Kore, Puck
-        system_instruction=SYSTEM_INSTRUCTION,
-        params=InputParams(thinking=ThinkingConfig(thinking_budget=0)),
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
+
+    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.0-flash-001")
+    # llm.register...
 
     messages = [
         {
@@ -243,9 +253,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
+            stt,
             rtvi,
             context_aggregator.user(),
             llm,
+            tts,
             receive_user_message,
             transport.output(),
             context_aggregator.assistant(),
