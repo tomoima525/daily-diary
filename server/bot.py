@@ -28,8 +28,11 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     Frame,
+    InputTextRawFrame,
+    LLMMessagesAppendFrame,
     LLMRunFrame,
     OutputTransportMessageUrgentFrame,
+    TTSSpeakFrame,
     TTSTextFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -46,6 +49,7 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIObserver,
     RTVIProcessor,
     RTVIServerMessage,
+    RTVIServerMessageFrame,
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -83,16 +87,21 @@ class ReceiveUserMessage(FrameProcessor):
 
         # Store user message and handle photo downloads
         if isinstance(frame, RTVIClientMessageFrame):
-            logger.info(f"User message: {frame.data}")
             # Check if this is a photo upload message
             if isinstance(frame.data, dict) and frame.data.get("type") == "client_message":
-                # First push message that you see the file is uploaded
-                frame = TTSTextFrame(text="I see the file is uploaded. Let me analyze it.")
-
+                # LLMMessagesAppendFrame
+                # await self.push_frame(
+                #     LLMMessagesAppendFrame(messages=[
+                #         {
+                #             "role": "user",
+                #             "content": "Tell me a small joke while photo is uploading",
+                #         }
+                #     ], run_llm=True),
+                #     direction=FrameDirection.UPSTREAM,
+                # )
                 await self.push_frame(
-                    frame,
-                    # OutputTransportMessageUrgentFrame(message=bot_check_photo_message.model_dump()),
-                    direction,
+                    InputTextRawFrame(text="Tell me a small joke while photo is uploading"),
+                    direction=FrameDirection.UPSTREAM,
                 )
                 file_url = frame.data.get("file_url")
                 if file_url:
@@ -101,14 +110,10 @@ class ReceiveUserMessage(FrameProcessor):
                     user_message = {}
                     user_message[file_url] = {"content": message}
                     self._user_messages.append(user_message)
-                    bot_message = RTVIServerMessage(
-                        data={
-                            "type": "bot_llm_text",
-                            "data": {"text": message},
-                        }
+                    await self.push_frame(
+                        InputTextRawFrame(text=message),
+                        direction=FrameDirection.UPSTREAM,
                     )
-                    new_frame = OutputTransportMessageUrgentFrame(message=bot_message.model_dump())
-                    await self.push_frame(new_frame, direction)
 
         else:
             await self.push_frame(frame, direction)
@@ -260,8 +265,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
         # Start the conversation with initial message
-
-        await task.queue_frames([LLMRunFrame()])
+        messages = [
+            {
+                "role": "user",
+                "content": "Hi!",
+            },
+        ]
+        context = OpenAILLMContext(messages=messages)
+        await task.queue_frames([OpenAILLMContextFrame(context=context)])
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport: DailyTransport, participant):
