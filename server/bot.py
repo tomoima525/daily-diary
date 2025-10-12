@@ -59,6 +59,10 @@ from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 from image_analyzer import ImageAnalyzer
 from s3_manager import S3PhotoManager
+from storyboard import StoryboardGenerator
+from caption_generator import CaptionGenerator
+from frame_creator import FrameCreator
+from video_generator import VideoGenerator
 
 load_dotenv(override=True)
 
@@ -75,6 +79,13 @@ class ReceiveUserMessage(FrameProcessor):
         self._image_analyzer = ImageAnalyzer()
         self._downloaded_images = []
         self._image_analyses = []
+        self._conversation_transcript = ""
+
+        # Video generation components
+        self._storyboard_generator = StoryboardGenerator()
+        self._caption_generator = CaptionGenerator()
+        self._frame_creator = FrameCreator()
+        self._video_generator = VideoGenerator()
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -87,6 +98,14 @@ class ReceiveUserMessage(FrameProcessor):
 
         # Store user message and handle photo downloads
         if isinstance(frame, RTVIClientMessageFrame):
+            logger.info(f"User message: {frame.data}")
+
+            # Capture conversation for video generation
+            if isinstance(frame.data, dict) and frame.data.get("type") == "client_message":
+                message_text = frame.data.get("message", "")
+                if message_text:
+                    self._conversation_transcript += f"User: {message_text}\n"
+
             # Check if this is a photo upload message
             if isinstance(frame.data, dict) and frame.data.get("type") == "client_message":
                 # LLMMessagesAppendFrame
@@ -114,7 +133,10 @@ class ReceiveUserMessage(FrameProcessor):
                         InputTextRawFrame(text=message),
                         direction=FrameDirection.UPSTREAM,
                     )
-
+            # Check for video generation requests
+            if self._is_video_generation_request(message_text):
+                await self._handle_video_generation_request(direction)
+                return
         else:
             await self.push_frame(frame, direction)
 
@@ -191,6 +213,100 @@ class ReceiveUserMessage(FrameProcessor):
         """Get the most recent image analysis."""
         return self._image_analyses[-1] if self._image_analyses else None
 
+    def _is_video_generation_request(self, message: str) -> bool:
+        """Check if the message is requesting video generation."""
+        trigger_phrases = [
+            "create video",
+            "make video",
+            "generate video",
+            "create memory video",
+            "make memory video",
+            "generate my video",
+            "create my memory video",
+            "make my memory video",
+            "video of this",
+            "turn this into a video",
+        ]
+
+        message_lower = message.lower()
+        return any(phrase in message_lower for phrase in trigger_phrases)
+
+    async def _handle_video_generation_request(self, direction: FrameDirection):
+        """Handle video generation workflow."""
+        try:
+            logger.info("Starting video generation process")
+
+            # Check if we have an image and conversation
+            latest_image = self.get_latest_image()
+            latest_analysis = self.get_latest_analysis()
+
+            if not latest_image or not latest_analysis:
+                error_message = "I need a photo and some conversation about it before I can create your memory video. Please share a photo and tell me about it first!"
+                await self._send_bot_message(error_message, direction)
+                return
+
+            # Send progress message
+            await self._send_bot_message(
+                "I'm creating your memory video now. This might take a moment...", direction
+            )
+
+            # Generate storyboard from conversation
+            logger.info("Generating storyboard")
+            scenes = self._storyboard_generator.generate_from_conversation(
+                self._conversation_transcript, latest_analysis["response"]
+            )
+
+            # Generate captions using AI
+            logger.info("Generating AI captions")
+            captions = await self._caption_generator.generate_captions_for_scenes(
+                latest_image["image"], self._conversation_transcript, scenes
+            )
+
+            # Create video frames
+            logger.info("Creating video frames")
+            frame_paths = await self._frame_creator.create_captioned_frames(
+                latest_image["image"], captions
+            )
+
+            if not frame_paths:
+                await self._send_bot_message(
+                    "I had trouble creating the video frames. Please try again.", direction
+                )
+                return
+
+            # Generate video
+            logger.info("Assembling video")
+            video_url = await self._video_generator.create_memory_video(frame_paths, scenes)
+
+            # Clean up frame files
+            self._frame_creator.cleanup_temp_frames(frame_paths)
+
+            if video_url:
+                success_message = f"Your memory video is ready! You can watch it here: {video_url}"
+                await self._send_bot_message(success_message, direction)
+                logger.info("Video generation completed successfully")
+            else:
+                await self._send_bot_message(
+                    "I encountered an issue while creating your video. Please try again.", direction
+                )
+
+        except Exception as e:
+            logger.error(f"Video generation failed: {e}")
+            await self._send_bot_message(
+                "I'm sorry, I encountered an error while creating your video. Please try again later.",
+                direction,
+            )
+
+    async def _send_bot_message(self, message: str, direction: FrameDirection):
+        """Send a message from the bot to the user."""
+        # Add to conversation transcript
+        self._conversation_transcript += f"Bot: {message}\n"
+
+        # Create and send message frame
+        bot_message = RTVIServerMessage(data={"type": "bot_llm_text", "data": {"text": message}})
+        frame = OutputTransportMessageUrgentFrame(message=bot_message.model_dump())
+        await self.push_frame(frame, direction)
+
 
 SYSTEM_INSTRUCTION = f"""
 You are Daily Diary, an AI assistant that helps users create beautiful memory videos from their daily stories.
@@ -200,7 +316,15 @@ Your conversation flow:
 2. Listen to their story with empathy and interest
 3. Ask them to share a photo from their day
 4. When they upload a photo, analyze it and ask questions about the moment
-5. Offer to create a memory video with their story and photo
+5. Engage in meaningful conversation about their experience and emotions
+6. Offer to create a memory video with their story and photo by suggesting phrases like "Would you like me to create a memory video?" or "I can turn this into a beautiful memory video for you"
+7. When they request video creation (with phrases like "create video", "make video", or "generate video"), process their request
+
+Video Creation:
+- Users can request videos by saying things like "create my memory video", "make a video", or "generate video"
+- You have the capability to create personalized memory videos using their photo and conversation
+- The videos include beautiful captions that capture the emotional essence of their story
+- Always be encouraging about the video creation process
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
 """
