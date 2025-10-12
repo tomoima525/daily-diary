@@ -237,12 +237,12 @@ class ReceiveUserMessage(FrameProcessor):
 
             if not latest_image or not latest_analysis:
                 error_message = "I need a photo and some conversation about it before I can create your memory video. Please share a photo and tell me about it first!"
-                await self._send_bot_message(error_message, direction)
+                await self._send_bot_message(error_message)
                 return
 
             # Send progress message
             await self._send_bot_message(
-                "I'm creating your memory video now. This might take a moment...", direction
+                "I'm creating your memory video now. This might take a moment...",
             )
 
             # Generate storyboard from conversation
@@ -265,7 +265,7 @@ class ReceiveUserMessage(FrameProcessor):
 
             if not frame_paths:
                 await self._send_bot_message(
-                    "I had trouble creating the video frames. Please try again.", direction
+                    "I had trouble creating the video frames. Please try again.",
                 )
                 return
 
@@ -278,7 +278,7 @@ class ReceiveUserMessage(FrameProcessor):
 
             if video_url:
                 success_message = f"Your memory video is ready! You can watch it here: {video_url}"
-                await self._send_bot_message(success_message, direction)
+                await self._send_bot_message(success_message)
                 logger.info("Video generation completed successfully")
             else:
                 await self._send_bot_message(
@@ -289,18 +289,18 @@ class ReceiveUserMessage(FrameProcessor):
             logger.error(f"Video generation failed: {e}")
             await self._send_bot_message(
                 "I'm sorry, I encountered an error while creating your video. Please try again later.",
-                direction,
             )
 
-    async def _send_bot_message(self, message: str, direction: FrameDirection):
+    async def _send_bot_message(self, message: str):
         """Send a message from the bot to the user."""
         # Add to conversation transcript
         self._conversation_transcript += f"Bot: {message}\n"
 
         # Create and send message frame
-        bot_message = RTVIServerMessage(data={"type": "bot_llm_text", "data": {"text": message}})
-        frame = OutputTransportMessageUrgentFrame(message=bot_message.model_dump())
-        await self.push_frame(frame, direction)
+        await self.push_frame(
+            InputTextRawFrame(text=message),
+            direction=FrameDirection.UPSTREAM,
+        )
 
 
 SYSTEM_INSTRUCTION = f"""
