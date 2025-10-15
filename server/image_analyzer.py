@@ -13,10 +13,23 @@ emotions, content, and generate empathetic responses about user photos.
 import asyncio
 import os
 from typing import Any, Dict, Optional
-
 import google.generativeai as genai
 from loguru import logger
 from PIL import Image
+
+
+analysis_prompt = """
+Look at this photo and analyze it as if you're helping someone create a memory diary. 
+
+Please provide:
+1. A brief description of what you see in the photo
+2. The emotional tone or mood you sense from the scene/people
+3. What kind of moment this appears to be (celebration, quiet moment, adventure, etc.)
+4. A warm, empathetic question about their feelings or thoughts during this moment
+
+Keep your response conversational and caring, as if talking to a friend about their memories.
+This response will be used in a voice conversation, so keep it short and make it sound like a conversation.
+"""
 
 
 class ImageAnalyzer:
@@ -25,23 +38,13 @@ class ImageAnalyzer:
     def __init__(self):
         # Initialize Google Generative AI
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.genai_model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        self.genai_model = genai.GenerativeModel(
+            "gemini-2.0-flash-exp", system_instruction=analysis_prompt
+        )
 
         # Analysis prompt template for Daily Diary context
-        self.analysis_prompt = """
-        Look at this photo and analyze it as if you're helping someone create a memory diary. 
-        
-        Please provide:
-        1. A brief description of what you see in the photo
-        2. The emotional tone or mood you sense from the scene/people
-        3. What kind of moment this appears to be (celebration, quiet moment, adventure, etc.)
-        4. A warm, empathetic question about their feelings or thoughts during this moment
-        
-        Keep your response conversational and caring, as if talking to a friend about their memories.
-        This response will be used in a voice conversation, so keep it short and make it sound like a conversation.
-        """
 
-    async def analyze_image(
+    async def _analyze_image(
         self, image: Image.Image, file_key: str = ""
     ) -> Optional[Dict[str, Any]]:
         """Analyze an image using Google Generative AI to understand emotions and content.
@@ -59,7 +62,7 @@ class ImageAnalyzer:
             # Run the analysis in a thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                None, lambda: self.genai_model.generate_content([self.analysis_prompt, image])
+                None, lambda: self.genai_model.generate_content(["Analyze this photo", image])
             )
 
             analysis_text = response.text
@@ -114,8 +117,9 @@ class ImageAnalyzer:
         """
         try:
             # Analyze the image
-            analysis_result = await self.analyze_image(image, file_key)
+            analysis_result = await self._analyze_image(image, file_key)
             logger.info(f"Analysis result: {analysis_result}")
+
             if not analysis_result:
                 return None
 

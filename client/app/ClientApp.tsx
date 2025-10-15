@@ -27,9 +27,9 @@ import {
 import React, { useEffect, useState } from "react";
 import { Logs, MonitorOff } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
-import { PhotoUpload } from './components/PhotoUpload';
-import { VideoDisplay } from './components/VideoDisplay';
-import { PhotoDisplay } from './components/PhotoDisplay';
+import { PhotoUpload } from "./components/PhotoUpload";
+import { VideoDisplay } from "./components/VideoDisplay";
+import { PhotoDisplay } from "./components/PhotoDisplay";
 import Image from "next/image";
 
 interface Props {
@@ -66,25 +66,29 @@ export const ClientApp: React.FC<Props> = ({
 
     const handleConnected = () => {
       // Access the Daily transport to get room information
-      const transport = client.transport as { dailyCallObject?: { room?: () => { domainName?: string; name?: string } } };
+      const transport = client.transport as {
+        dailyCallObject?: {
+          room?: () => { domainName?: string; name?: string };
+        };
+      };
       if (transport && transport.dailyCallObject) {
         const callObject = transport.dailyCallObject;
         if (callObject.room) {
           const roomInfo = callObject.room();
-          const dailyRoomUrl = roomInfo.domainName || roomInfo.name || '';
+          const dailyRoomUrl = roomInfo.domainName || roomInfo.name || "";
           // Extract room ID from URL or use full room name
-          const extractedRoomId = dailyRoomUrl.split('/').pop() || dailyRoomUrl;
+          const extractedRoomId = dailyRoomUrl.split("/").pop() || dailyRoomUrl;
           setRoomId(extractedRoomId);
-          console.log('Daily room ID captured:', extractedRoomId);
+          console.log("Daily room ID captured:", extractedRoomId);
         }
       }
     };
 
     // Listen for connection events
-    client.on('connected', handleConnected);
-    
+    client.on("connected", handleConnected);
+
     return () => {
-      client.off('connected', handleConnected);
+      client.off("connected", handleConnected);
     };
   }, [client]);
 
@@ -112,16 +116,11 @@ export const ClientApp: React.FC<Props> = ({
 
   const handlePhotoUpload = (url: string) => {
     setUploadedPhotoUrl(url);
-    client?.sendClientMessage('photo_uploaded', {
-      type: 'photo_upload',
-      url: url,
-      roomId: roomId,
-    });
   };
 
   const handleUploadComplete = (fileKey: string) => {
-    client?.sendClientMessage('upload_complete', {
-      type: 'client_message',
+    client?.sendClientMessage("upload_complete", {
+      type: "photo_upload",
       file_url: fileKey,
     });
   };
@@ -192,8 +191,14 @@ export const ClientApp: React.FC<Props> = ({
             <ResizablePanel defaultSize={70} minSize={40}>
               {/* Small screens: resizable split between conversation and screenshare */}
               <div className="lg:hidden! h-full">
-                <ResizablePanelGroup direction="horizontal" className="h-full gap-2">
-                  <ResizablePanel defaultSize={uploadedPhotoUrl ? 60 : 100} minSize={40}>
+                <ResizablePanelGroup
+                  direction="horizontal"
+                  className="h-full gap-2"
+                >
+                  <ResizablePanel
+                    defaultSize={uploadedPhotoUrl ? 60 : 100}
+                    minSize={40}
+                  >
                     <Panel className="h-full">
                       <PanelHeader>
                         <PanelTitle>Conversation</PanelTitle>
@@ -215,14 +220,18 @@ export const ClientApp: React.FC<Props> = ({
                   {uploadedPhotoUrl && (
                     <>
                       <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={40} minSize={30} maxSize={60}>
+                      <ResizablePanel
+                        defaultSize={40}
+                        minSize={30}
+                        maxSize={60}
+                      >
                         <Panel className="h-full">
                           <PanelHeader>
                             <PanelTitle>Photo</PanelTitle>
                           </PanelHeader>
                           <PanelContent className="h-full p-2 flex items-center justify-center">
-                            <PhotoDisplay 
-                              photoUrl={uploadedPhotoUrl} 
+                            <PhotoDisplay
+                              photoUrl={uploadedPhotoUrl}
                               onClear={() => setUploadedPhotoUrl(null)}
                             />
                           </PanelContent>
@@ -239,7 +248,10 @@ export const ClientApp: React.FC<Props> = ({
                   direction="horizontal"
                   className="h-full gap-2"
                 >
-                  <ResizablePanel defaultSize={uploadedPhotoUrl ? 65 : 100} minSize={30}>
+                  <ResizablePanel
+                    defaultSize={uploadedPhotoUrl ? 65 : 100}
+                    minSize={30}
+                  >
                     <Panel className="h-full">
                       <PanelHeader>
                         <PanelTitle>Conversation</PanelTitle>
@@ -261,14 +273,18 @@ export const ClientApp: React.FC<Props> = ({
                   {uploadedPhotoUrl && (
                     <>
                       <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                      <ResizablePanel
+                        defaultSize={35}
+                        minSize={25}
+                        maxSize={50}
+                      >
                         <Panel className="h-full">
                           <PanelHeader>
                             <PanelTitle>Uploaded Photo</PanelTitle>
                           </PanelHeader>
                           <PanelContent className="h-full p-4 flex items-center justify-center">
-                            <PhotoDisplay 
-                              photoUrl={uploadedPhotoUrl} 
+                            <PhotoDisplay
+                              photoUrl={uploadedPhotoUrl}
                               onClear={() => setUploadedPhotoUrl(null)}
                             />
                           </PanelContent>
@@ -295,10 +311,10 @@ export const ClientApp: React.FC<Props> = ({
                 <UserAudioControl visualizerProps={{ barCount: 5 }} />
                 <UserVideoControl noVideo />
                 {!isMobile && <UserScreenControl noScreen />}
-                <PhotoUpload 
-                  onUpload={handlePhotoUpload} 
+                <PhotoUpload
+                  onUpload={handlePhotoUpload}
                   onUploadComplete={handleUploadComplete}
-                  roomId={roomId} 
+                  roomId={roomId}
                 />
               </CardContent>
             </Card>
