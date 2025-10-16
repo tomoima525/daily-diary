@@ -107,10 +107,6 @@ export const ClientApp: React.FC<Props> = ({
 
   const [showLogs, setShowLogs] = useState(false);
   const handleToggleLogs = () => {
-    client?.sendClientMessage("Test message", {
-      type: "client_message",
-      url: "https://www.google.com",
-    });
     setShowLogs((prev) => !prev);
   };
 
@@ -150,9 +146,8 @@ export const ClientApp: React.FC<Props> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <Image src="/pipecat.svg" alt="Pipecat" width={32} height={32} />
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Pipecat + Gemini + Voice UI Kit
+                Daily Diary 📔
               </h1>
             </div>
             {!hasDisconnected && (
@@ -187,115 +182,7 @@ export const ClientApp: React.FC<Props> = ({
         </main>
       ) : (
         <main className="relative max-w-7xl mx-auto mt-8 px-4 h-[calc(100vh-var(--header-height)-var(--controls-height))] overflow-hidden">
-          <ResizablePanelGroup direction="vertical" className="h-full gap-2">
-            <ResizablePanel defaultSize={70} minSize={40}>
-              {/* Small screens: resizable split between conversation and screenshare */}
-              <div className="lg:hidden! h-full">
-                <ResizablePanelGroup
-                  direction="horizontal"
-                  className="h-full gap-2"
-                >
-                  <ResizablePanel
-                    defaultSize={uploadedPhotoUrl ? 60 : 100}
-                    minSize={40}
-                  >
-                    <Panel className="h-full">
-                      <PanelHeader>
-                        <PanelTitle>Conversation</PanelTitle>
-                      </PanelHeader>
-                      <PanelContent className="h-full p-0! min-h-0">
-                        <div className="flex flex-col h-full">
-                          <div className="flex-1">
-                            <Conversation
-                              assistantLabel="Gemini"
-                              clientLabel="You"
-                              textMode="tts"
-                            />
-                          </div>
-                          <VideoDisplay videoUrl={videoUrl} />
-                        </div>
-                      </PanelContent>
-                    </Panel>
-                  </ResizablePanel>
-                  {uploadedPhotoUrl && (
-                    <>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel
-                        defaultSize={40}
-                        minSize={30}
-                        maxSize={60}
-                      >
-                        <Panel className="h-full">
-                          <PanelHeader>
-                            <PanelTitle>Photo</PanelTitle>
-                          </PanelHeader>
-                          <PanelContent className="h-full p-2 flex items-center justify-center">
-                            <PhotoDisplay
-                              photoUrl={uploadedPhotoUrl}
-                              onClear={() => setUploadedPhotoUrl(null)}
-                            />
-                          </PanelContent>
-                        </Panel>
-                      </ResizablePanel>
-                    </>
-                  )}
-                </ResizablePanelGroup>
-              </div>
-
-              {/* Large screens: resizable split between conversation and screenshare */}
-              <div className="hidden lg:block! h-full">
-                <ResizablePanelGroup
-                  direction="horizontal"
-                  className="h-full gap-2"
-                >
-                  <ResizablePanel
-                    defaultSize={uploadedPhotoUrl ? 65 : 100}
-                    minSize={30}
-                  >
-                    <Panel className="h-full">
-                      <PanelHeader>
-                        <PanelTitle>Conversation</PanelTitle>
-                      </PanelHeader>
-                      <PanelContent className="h-full p-0! min-h-0">
-                        <div className="flex flex-col h-full">
-                          <div className="flex-1">
-                            <Conversation
-                              assistantLabel="Gemini"
-                              clientLabel="You"
-                              textMode="tts"
-                            />
-                          </div>
-                          <VideoDisplay videoUrl={videoUrl} />
-                        </div>
-                      </PanelContent>
-                    </Panel>
-                  </ResizablePanel>
-                  {uploadedPhotoUrl && (
-                    <>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel
-                        defaultSize={35}
-                        minSize={25}
-                        maxSize={50}
-                      >
-                        <Panel className="h-full">
-                          <PanelHeader>
-                            <PanelTitle>Uploaded Photo</PanelTitle>
-                          </PanelHeader>
-                          <PanelContent className="h-full p-4 flex items-center justify-center">
-                            <PhotoDisplay
-                              photoUrl={uploadedPhotoUrl}
-                              onClear={() => setUploadedPhotoUrl(null)}
-                            />
-                          </PanelContent>
-                        </Panel>
-                      </ResizablePanel>
-                    </>
-                  )}
-                </ResizablePanelGroup>
-              </div>
-            </ResizablePanel>
-            <ResizableHandle className={cn({ hidden: !showLogs })} withHandle />
+          <ResizablePanelGroup direction="horizontal">
             <ResizablePanel
               defaultSize={30}
               minSize={20}
@@ -304,7 +191,6 @@ export const ClientApp: React.FC<Props> = ({
               <EventStreamPanel />
             </ResizablePanel>
           </ResizablePanelGroup>
-
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2">
             <Card>
               <CardContent className="flex items-center justify-center gap-2">
@@ -319,37 +205,6 @@ export const ClientApp: React.FC<Props> = ({
               </CardContent>
             </Card>
           </div>
-
-          <div
-            className={cn(
-              "fixed bottom-8 right-8 w-64 rounded-xl overflow-hidden transition-all origin-bottom-right bg-white shadow-gray-600 shadow-md",
-              {
-                "opacity-0 scale-0": !isCamEnabled,
-                "opacity-100 scale-100": isCamEnabled,
-              }
-            )}
-          >
-            <PipecatClientVideo participant="local" trackType="video" />
-          </div>
-
-          {isMobile && (
-            <div className="mt-8">
-              <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
-                <CardContent className="pt-6">
-                  <div className="flex items-center space-x-2 text-yellow-800 dark:text-yellow-200">
-                    <MonitorOff className="h-5 w-5" />
-                    <p className="font-medium">
-                      Screen sharing is not available on mobile devices
-                    </p>
-                  </div>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    Please use a desktop browser to access screen sharing
-                    features.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </main>
       )}
     </div>
