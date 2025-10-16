@@ -1,4 +1,4 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyEventV2 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { v4 as uuidv4 } from "uuid";
 
@@ -34,11 +34,15 @@ const headers = {
 };
 
 export const handler = async (
-  event: APIGatewayProxyEvent
+  event: APIGatewayProxyEvent | APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResult> => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  if (event.httpMethod === "OPTIONS") {
+  // Handle both API Gateway v1 and v2 (Function URL) events
+  const httpMethod = 'httpMethod' in event ? event.httpMethod : event.requestContext?.http?.method;
+  const body = event.body;
+
+  if (httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers,
@@ -46,7 +50,7 @@ export const handler = async (
     };
   }
 
-  if (event.httpMethod !== "POST") {
+  if (httpMethod !== "POST") {
     return {
       statusCode: 405,
       headers,
@@ -57,7 +61,7 @@ export const handler = async (
   }
 
   try {
-    if (!event.body) {
+    if (!body) {
       return {
         statusCode: 400,
         headers,
@@ -69,7 +73,7 @@ export const handler = async (
 
     let requestBody: VideoGenerationRequest;
     try {
-      requestBody = JSON.parse(event.body);
+      requestBody = JSON.parse(body);
     } catch (error) {
       return {
         statusCode: 400,

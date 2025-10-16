@@ -166,7 +166,7 @@ export class DailyDiaryStack extends cdk.Stack {
       cors: {
         allowCredentials: false,
         allowedHeaders: ["Content-Type", "Authorization"],
-        allowedMethods: [lambda.HttpMethod.POST, lambda.HttpMethod.OPTIONS],
+        allowedMethods: [lambda.HttpMethod.POST],
         allowedOrigins: ["*"],
         maxAge: cdk.Duration.hours(1),
       },
