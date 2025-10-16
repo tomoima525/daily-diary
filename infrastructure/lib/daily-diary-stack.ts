@@ -136,6 +136,42 @@ export class DailyDiaryStack extends cdk.Stack {
     // Grant S3 permissions to the video generator function
     bucket.grantReadWrite(videoGeneratorFunction);
 
+    // Video API Lambda Function
+    const videoApiFunction = new NodejsFunction(
+      this,
+      "VideoApiFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: "lambda/video-api/src/index.ts",
+        timeout: cdk.Duration.seconds(30),
+        memorySize: 512,
+        environment: {
+          VIDEO_GENERATOR_FUNCTION_NAME: videoGeneratorFunction.functionName,
+        },
+        bundling: {
+          externalModules: ["@aws-sdk/*"],
+          minify: false,
+          sourceMap: true,
+        },
+      }
+    );
+
+    // Grant permissions for video-api to invoke video-generator
+    videoGeneratorFunction.grantInvoke(videoApiFunction);
+
+    // Create Function URL for video-api
+    const videoApiFunctionUrl = videoApiFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowCredentials: false,
+        allowedHeaders: ["Content-Type", "Authorization"],
+        allowedMethods: [lambda.HttpMethod.POST, lambda.HttpMethod.OPTIONS],
+        allowedOrigins: ["*"],
+        maxAge: cdk.Duration.hours(1),
+      },
+    });
+
     // Output values for use in application
     new cdk.CfnOutput(this, "BucketName", {
       value: bucket.bucketName,
@@ -155,6 +191,16 @@ export class DailyDiaryStack extends cdk.Stack {
     new cdk.CfnOutput(this, "VideoGeneratorFunctionArn", {
       value: videoGeneratorFunction.functionArn,
       description: "Video generator Lambda function ARN",
+    });
+
+    new cdk.CfnOutput(this, "VideoApiUrl", {
+      value: videoApiFunctionUrl.url,
+      description: "Video API Lambda Function URL",
+    });
+
+    new cdk.CfnOutput(this, "VideoApiFunctionArn", {
+      value: videoApiFunction.functionArn,
+      description: "Video API Lambda function ARN",
     });
   }
 }

@@ -19,10 +19,12 @@ interface PhotoMemory {
 
 interface VideoGenerationEvent {
   photo_memories: PhotoMemory[];
+  requestId?: string;
 }
 
 interface VideoGenerationResponse {
   video_url: string;
+  requestId?: string;
 }
 
 async function generateVideo(generatedImages: string[], outputPath: string) {
@@ -146,7 +148,10 @@ export const handler: Handler<
   VideoGenerationEvent,
   VideoGenerationResponse
 > = async (event) => {
-  const { photo_memories } = event;
+  const { photo_memories, requestId } = event;
+  
+  console.log(`Starting video generation with requestId: ${requestId || 'N/A'}`);
+  console.log(`Processing ${photo_memories.length} photo memories`);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "video-gen-"));
   const bucketName = process.env.S3_BUCKET_NAME!;
   const secretId = process.env.DAILY_DIARY_SECRET_ID!;
@@ -212,8 +217,12 @@ export const handler: Handler<
     const videoUrl = await uploadVideoToS3(videoPath, bucketName, videoKey);
     fs.rmSync(tempDir, { recursive: true, force: true });
 
+    console.log(`Video generation completed successfully with requestId: ${requestId || 'N/A'}`);
+    console.log(`Video URL: ${videoUrl}`);
+
     return {
       video_url: videoUrl,
+      requestId,
     };
   } catch (error) {
     fs.rmSync(tempDir, { recursive: true, force: true });
