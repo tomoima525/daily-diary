@@ -21,6 +21,8 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -54,12 +56,17 @@ You are Daily Diary, an AI assistant that helps users create beautiful memory vi
 
 Your conversation flow:
 1. Warmly greet the user and ask about their day
-2. Listen to their story with empathy and interest
-3. Ask them to share a photo from their day
-4. When they upload a photo, analyze it and ask questions about the moment
-5. Offer to create a memory video with their story and photo
+3. Ask them to share a photo from their day. Tell them to let them know when they finished uploading.
+4. Analyze photos one by one and ask feelings and stories about the moment. Keep track of the file_path of a photo so we can keep track of the feelings of each photo.
+5. When all photos are reviewed, Offer to create a memory video with their story and photo
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
+
+You have access to three tools: analyze_photo, store_user_feelings, generate_video
+
+For photo analysis, use `analyze_photo` function.
+For storing user's feelings about each photo, use `store_user_feelings` function.
+For generating a video, use `generate_video` function.
 """
 
 
@@ -67,7 +74,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
-    - Gemini Live multimodal model integration
+    - Gemini model integration
     - Voice activity detection
     - RTVI event handling
     """
@@ -80,6 +87,48 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.0-flash-001")
+
+    # Function calls
+    analyze_photo_function = FunctionSchema(
+        name="analyze_photo",
+        description="Analyze photo and returns description of what's in the photo and file_path of the photo",
+        properties={
+            "file_path": {
+                "type": "string",
+                "description": "The path to a photo file",
+            },
+        },
+        required=["file_path"],
+    )
+
+    store_user_feelings_function = FunctionSchema(
+        name="store_user_feelings",
+        description="Store user feelings and stories to a data storage",
+        properties={
+            "file_path": {
+                "type": "string",
+                "description": "The path to a photo file",
+            },
+            "feelings": {"type": "string", "description": "User's feelings and stories"},
+        },
+        required=["file_path", "feelings"],
+    )
+
+    generate_video_function = FunctionSchema(
+        name="generate_video",
+        description="Generate video and provide the url of the video",
+        properties={},
+        required=[],
+    )
+
+    tools = ToolsSchema(
+        standard_tools=[
+            analyze_photo_function,
+            store_user_feelings_function,
+            generate_video_function,
+        ]
+    )
+
     # llm.register...
 
     messages = [
@@ -95,7 +144,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # Set up conversation context and management
     # The context aggregator will automatically collect conversation context
-    context = OpenAILLMContext(messages)
+    context = OpenAILLMContext(messages, tools=tools)
     context_aggregator = llm.create_context_aggregator(context)
 
     # RTVI events for Pipecat client UI

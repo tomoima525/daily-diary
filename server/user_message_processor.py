@@ -38,6 +38,7 @@ class ReceiveUserMessageProcessor(FrameProcessor):
         if isinstance(frame, RTVIClientMessageFrame):
             # Check if this is a photo upload message
             if isinstance(frame.data, dict) and frame.data.get("type") == "photo_upload":
+                # An example to send message to LLM
                 # # LLMMessagesAppendFrame
                 # await self.push_frame(
                 #     LLMMessagesAppendFrame(
@@ -51,28 +52,24 @@ class ReceiveUserMessageProcessor(FrameProcessor):
                 #     ),
                 #     direction=FrameDirection.UPSTREAM,
                 # )
+                # context = OpenAILLMContext(
+                #     messages=[
+                #         {
+                #             "role": "system",
+                #             "content": "",
+                #         }
+                #     ],
+                # )
+                # await self.push_frame(
+                #     OpenAILLMContextFrame(
+                #         run_llm=True,
+                #     ),
+                #     direction=FrameDirection.UPSTREAM,
+                # )
 
                 file_url = frame.data.get("file_url")
                 if file_url:
                     await self._handle_photo_download(file_url)
-                    # Create a dictionary using the file_url as key and message as value
-                    user_message = {}
-                    user_message[file_url] = {"content": message}
-                    self._user_messages.append(user_message)
-                    context = OpenAILLMContext(
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": f"Your task is to ask how they felt about this photo. {message}",
-                            }
-                        ],
-                    )
-                    await self.push_frame(
-                        OpenAILLMContextFrame(
-                            run_llm=True,
-                        ),
-                        direction=FrameDirection.UPSTREAM,
-                    )
 
         else:
             await self.push_frame(frame, direction)
