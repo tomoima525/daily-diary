@@ -18,9 +18,11 @@ the conversation flow using Gemini's streaming capabilities.
 """
 
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
+from PIL import Image
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -43,9 +45,11 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
+from image_analyzer import ImageAnalyzer
 from user_message_processor import ReceiveUserMessageProcessor
 
 load_dotenv(override=True)
@@ -56,18 +60,55 @@ You are Daily Diary, an AI assistant that helps users create beautiful memory vi
 
 Your conversation flow:
 1. Warmly greet the user and ask about their day
-3. Ask them to share a photo from their day. Tell them to let them know when they finished uploading.
-4. Analyze photos one by one and ask feelings and stories about the moment. Keep track of the file_path of a photo so we can keep track of the feelings of each photo.
+3. Ask them to share a photo from their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
+4. Analyze photos one by one and ask feelings and stories about the moment until all photos in the queue are reviewed. 
 5. When all photos are reviewed, Offer to create a memory video with their story and photo
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
 
-You have access to three tools: analyze_photo, store_user_feelings, generate_video
+You have access to four tools: get_photo_name, analyze_photo, store_user_feelings, generate_video
 
-For photo analysis, use `analyze_photo` function.
+For getting a photo name from stored images, use `get_photo_name` function. It will return the name of the photo(e.g. image_0, image_1, etc.) or None if there is no photo in the queue.
+For photo analysis, use `analyze_photo` function. It will return the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo.
 For storing user's feelings about each photo, use `store_user_feelings` function.
 For generating a video, use `generate_video` function.
 """
+
+image_analyzer = ImageAnalyzer()
+receive_user_message = ReceiveUserMessageProcessor()
+
+
+# functions
+async def get_photo_name(params: FunctionCallParams):
+    try:
+        photo_name = receive_user_message.get_downloaded_images_queue().popleft()["file_name"]
+        logger.info(f"==== photo_name {photo_name}")
+        return photo_name
+    except Exception as e:
+        logger.info(f"No photo in the queue")
+        return None
+
+
+async def analyze_photo(params: FunctionCallParams):
+    photo_name = params.arguments["photo_name"]
+    image = receive_user_message.get_downloaded_images_list().get(photo_name)["image"]
+    if image:
+        logger.info(f"==== file_path {image.size}")
+        description = await image_analyzer.analyze_and_respond(image)
+        logger.info(f"==== description {description}")
+        return {
+            "photo_name": photo_name,
+            "description": description,
+        }
+    else:
+        logger.info(f"==== no image found for photo_name {photo_name}")
+        return None
+
+
+async def store_user_feelings(params: FunctionCallParams):
+    photo_name = params.arguments["photo_name"]
+    feelings = params.arguments["feelings"]
+    # TODO Store user feelings and stories to a data storage
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -89,29 +130,36 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.0-flash-001")
 
     # Function calls
+    get_photo_name_function = FunctionSchema(
+        name="get_photo_name",
+        description="Get a photo name from stored photo queue. If there is no photo in the queue, return None",
+        properties={},
+        required=[],
+    )
+
     analyze_photo_function = FunctionSchema(
         name="analyze_photo",
-        description="Analyze photo and returns description of what's in the photo and file_path of the photo",
+        description="Analyze photo and returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo",
         properties={
-            "file_path": {
+            "photo_name": {
                 "type": "string",
-                "description": "The path to a photo file",
+                "description": "The name of a photo file(e.g. image_0, image_1, etc.)",
             },
         },
-        required=["file_path"],
+        required=["photo_name"],
     )
 
     store_user_feelings_function = FunctionSchema(
         name="store_user_feelings",
         description="Store user feelings and stories to a data storage",
         properties={
-            "file_path": {
+            "photo_name": {
                 "type": "string",
-                "description": "The path to a photo file",
+                "description": "The name of a photo file",
             },
             "feelings": {"type": "string", "description": "User's feelings and stories"},
         },
-        required=["file_path", "feelings"],
+        required=["photo_name", "feelings"],
     )
 
     generate_video_function = FunctionSchema(
@@ -149,7 +197,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # RTVI events for Pipecat client UI
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    receive_user_message = ReceiveUserMessageProcessor()
 
     pipeline = Pipeline(
         [

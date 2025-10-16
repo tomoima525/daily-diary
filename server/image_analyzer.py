@@ -13,10 +13,10 @@ emotions, content, and generate empathetic responses about user photos.
 import asyncio
 import os
 from typing import Any, Dict, Optional
+
 import google.generativeai as genai
 from loguru import logger
 from PIL import Image
-
 
 analysis_prompt = """
 Look at this photo and analyze it as if you're helping someone create a memory diary. 
@@ -44,9 +44,7 @@ class ImageAnalyzer:
 
         # Analysis prompt template for Daily Diary context
 
-    async def _analyze_image(
-        self, image: Image.Image, file_key: str = ""
-    ) -> Optional[Dict[str, Any]]:
+    async def _analyze_image(self, image: Image.Image) -> Optional[Dict[str, Any]]:
         """Analyze an image using Google Generative AI to understand emotions and content.
 
         Args:
@@ -57,7 +55,7 @@ class ImageAnalyzer:
             Dictionary with analysis results, or None if analysis fails
         """
         try:
-            logger.info(f"Starting image analysis for {file_key or 'uploaded image'}")
+            logger.info(f"Starting image analysis")
 
             # Run the analysis in a thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -66,22 +64,18 @@ class ImageAnalyzer:
             )
 
             analysis_text = response.text
-            logger.info(f"Successfully analyzed image {file_key}")
+            logger.info(f"Successfully analyzed image")
 
             return {
-                "file_key": file_key,
                 "analysis": analysis_text,
                 "timestamp": loop.time(),
-                "model": "gemini-2.0-flash-exp",
-                "image_size": image.size,
-                "image_format": image.format,
             }
 
         except Exception as e:
-            logger.error(f"Failed to analyze image {file_key}: {e}")
+            logger.error(f"Failed to analyze image {image.info}: {e}")
             return None
 
-    async def generate_memory_response(self, analysis_result: Dict[str, Any]) -> Optional[str]:
+    async def _generate_memory_response(self, analysis_result: Dict[str, Any]) -> Optional[str]:
         """Generate a personalized response based on image analysis for Daily Diary.
 
         Args:
@@ -105,7 +99,7 @@ class ImageAnalyzer:
             logger.error(f"Failed to generate memory response: {e}")
             return None
 
-    async def analyze_and_respond(self, image: Image.Image, file_key: str = "") -> Optional[str]:
+    async def analyze_and_respond(self, image: Image.Image) -> Optional[str]:
         """Complete workflow: analyze image and generate response for Daily Diary.
 
         Args:
@@ -117,14 +111,14 @@ class ImageAnalyzer:
         """
         try:
             # Analyze the image
-            analysis_result = await self._analyze_image(image, file_key)
+            analysis_result = await self._analyze_image(image)
             logger.info(f"Analysis result: {analysis_result}")
 
             if not analysis_result:
                 return None
 
             # Generate the memory response
-            response = await self.generate_memory_response(analysis_result)
+            response = await self._generate_memory_response(analysis_result)
             logger.info(f"Analysis response: {response}")
             return response
 

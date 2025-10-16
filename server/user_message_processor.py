@@ -1,12 +1,15 @@
+from collections import deque
+
 from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     # LLMMessagesAppendFrame,
 )
-from pipecat.processors.aggregators.openai_llm_context import (
-    OpenAILLMContext,
-    OpenAILLMContextFrame,
-)
+
+# from pipecat.processors.aggregators.openai_llm_context import (
+#     OpenAILLMContext,
+#     OpenAILLMContextFrame,
+# )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import (
     RTVIClientMessageFrame,
@@ -23,7 +26,8 @@ class ReceiveUserMessageProcessor(FrameProcessor):
     def __init__(self):
         super().__init__()
         self._s3_manager = S3PhotoManager()
-        self._downloaded_images = []
+        self._downloaded_images_queue = deque()
+        self._downloaded_images_list = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -71,8 +75,7 @@ class ReceiveUserMessageProcessor(FrameProcessor):
                 if file_url:
                     await self._handle_photo_download(file_url)
 
-        else:
-            await self.push_frame(frame, direction)
+        await self.push_frame(frame, direction)
 
     async def _handle_photo_download(self, file_key: str):
         """Handle downloading a photo from S3 when user uploads one.
@@ -85,14 +88,20 @@ class ReceiveUserMessageProcessor(FrameProcessor):
             # Download the image
             image = await self._s3_manager.download_image(file_key)
             if image:
+                # Current index as length
+                current_index = len(self._downloaded_images)
+                file_name = f"image_{current_index}"
                 # Store downloaded image
                 image_data = {
+                    "file_name": file_name,
                     "file_key": file_key,
                     "image": image,
                     "size": image.size,
                     "format": image.format,
                 }
-                self._downloaded_images.append(image_data)
+
+                self._downloaded_images_queue.append(image_data)
+                self._downloaded_images_list.append(image_data)
                 logger.info(f"Successfully processed photo: {file_key} ({image.size})")
             else:
                 logger.error(f"Failed to download photo: {file_key}")
@@ -101,6 +110,10 @@ class ReceiveUserMessageProcessor(FrameProcessor):
             logger.error(f"Error handling photo download for {file_key}: {e}")
             return None
 
-    def get_downloaded_images(self):
-        """Get list of successfully downloaded images."""
-        return self._downloaded_images
+    def get_downloaded_images_queue(self):
+        """Get queue of successfully downloaded items"""
+        return self._downloaded_images_queue
+
+    def get_downloaded_images_list(self):
+        """Get list of successfully downloaded items"""
+        return self._downloaded_images_list
