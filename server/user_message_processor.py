@@ -1,4 +1,4 @@
-from collections import deque
+from typing import Optional
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -15,6 +15,7 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIClientMessageFrame,
 )
 
+from photo_memory_storage import PhotoMemoryStorage
 from s3_manager import S3PhotoManager
 
 
@@ -23,11 +24,10 @@ class ReceiveUserMessageProcessor(FrameProcessor):
     Receive user message and handle photo downloads from S3
     """
 
-    def __init__(self):
+    def __init__(self, photo_storage: Optional[PhotoMemoryStorage] = None):
         super().__init__()
         self._s3_manager = S3PhotoManager()
-        self._downloaded_images_queue = deque()
-        self._downloaded_images_list = []
+        self._photo_storage = photo_storage if photo_storage is not None else PhotoMemoryStorage()
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         """Process incoming frames and store user message.
@@ -88,21 +88,19 @@ class ReceiveUserMessageProcessor(FrameProcessor):
             # Download the image
             image = await self._s3_manager.download_image(file_key)
             if image:
-                # Current index as length
-                current_index = len(self._downloaded_images)
-                file_name = f"image_{current_index}"
-                # Store downloaded image
-                image_data = {
-                    "file_name": file_name,
-                    "file_key": file_key,
-                    "image": image,
-                    "size": image.size,
-                    "format": image.format,
-                }
-
-                self._downloaded_images_queue.append(image_data)
-                self._downloaded_images_list.append(image_data)
-                logger.info(f"Successfully processed photo: {file_key} ({image.size})")
+                # Add to photo storage with deduplication
+                photo_name, is_new = await self._photo_storage.add_photo(
+                    image=image,
+                    file_path=file_key,
+                    original_file_key=file_key
+                )
+                
+                if is_new:
+                    logger.info(f"Successfully processed new photo: {photo_name} from {file_key} ({image.size})")
+                else:
+                    logger.info(f"Photo already exists as: {photo_name} from {file_key}")
+                    
+                return photo_name
             else:
                 logger.error(f"Failed to download photo: {file_key}")
                 return None
@@ -110,10 +108,14 @@ class ReceiveUserMessageProcessor(FrameProcessor):
             logger.error(f"Error handling photo download for {file_key}: {e}")
             return None
 
+    def get_photo_storage(self) -> PhotoMemoryStorage:
+        """Get the photo storage instance"""
+        return self._photo_storage
+
     def get_downloaded_images_queue(self):
-        """Get queue of successfully downloaded items"""
-        return self._downloaded_images_queue
+        """Get queue of successfully downloaded items (legacy method)"""
+        return self._photo_storage.get_photo_queue()
 
     def get_downloaded_images_list(self):
-        """Get list of successfully downloaded items"""
-        return self._downloaded_images_list
+        """Get list of successfully downloaded items (legacy method)"""
+        return list(self._photo_storage.get_all_photos().values())

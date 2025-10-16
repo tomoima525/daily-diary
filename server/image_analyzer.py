@@ -19,7 +19,7 @@ from loguru import logger
 from PIL import Image
 
 analysis_prompt = """
-Look at this photo and analyze it as if you're helping someone create a memory diary. 
+You are helpful assistant that analyzes a photo as if you're helping someone create a memory diary. 
 
 Please provide:
 1. A brief description of what you see in the photo
@@ -39,7 +39,7 @@ class ImageAnalyzer:
         # Initialize Google Generative AI
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         self.genai_model = genai.GenerativeModel(
-            "gemini-2.0-flash-exp", system_instruction=analysis_prompt
+            "gemini-2.5-flash", system_instruction=analysis_prompt
         )
 
         # Analysis prompt template for Daily Diary context

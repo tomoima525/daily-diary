@@ -28,6 +28,7 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -50,6 +51,7 @@ from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 from image_analyzer import ImageAnalyzer
+from photo_memory_storage import PhotoMemoryStorage
 from user_message_processor import ReceiveUserMessageProcessor
 
 load_dotenv(override=True)
@@ -59,8 +61,7 @@ SYSTEM_INSTRUCTION = f"""
 You are Daily Diary, an AI assistant that helps users create beautiful memory videos from their daily stories.
 
 Your conversation flow:
-1. Warmly greet the user and ask about their day
-3. Ask them to share a photo from their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
+3. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
 4. Analyze photos one by one and ask feelings and stories about the moment until all photos in the queue are reviewed. 
 5. When all photos are reviewed, Offer to create a memory video with their story and photo
 
@@ -75,40 +76,92 @@ For generating a video, use `generate_video` function.
 """
 
 image_analyzer = ImageAnalyzer()
-receive_user_message = ReceiveUserMessageProcessor()
+photo_storage = PhotoMemoryStorage()
+receive_user_message = ReceiveUserMessageProcessor(photo_storage)
 
 
 # functions
 async def get_photo_name(params: FunctionCallParams):
-    try:
-        photo_name = receive_user_message.get_downloaded_images_queue().popleft()["file_name"]
+    photo_name = photo_storage.pop_next_photo()
+    if photo_name:
         logger.info(f"==== photo_name {photo_name}")
-        return photo_name
-    except Exception as e:
+        await params.result_callback(photo_name)
+    else:
         logger.info(f"No photo in the queue")
-        return None
+        await params.result_callback(None)
 
 
 async def analyze_photo(params: FunctionCallParams):
     photo_name = params.arguments["photo_name"]
-    image = receive_user_message.get_downloaded_images_list().get(photo_name)["image"]
+    image = photo_storage.get_photo_image(photo_name)
+
     if image:
-        logger.info(f"==== file_path {image.size}")
+        logger.info(f"==== analyzing photo {photo_name} with size {image.size}")
+        await params.llm.push_frame(
+            TTSSpeakFrame(f"Give me a sec, analyzing photo {photo_name}...")
+        )
         description = await image_analyzer.analyze_and_respond(image)
         logger.info(f"==== description {description}")
-        return {
-            "photo_name": photo_name,
-            "description": description,
-        }
+        await params.result_callback(
+            {
+                "photo_name": photo_name,
+                "description": description,
+            }
+        )
     else:
-        logger.info(f"==== no image found for photo_name {photo_name}")
-        return None
+        logger.error(f"==== no image found for photo_name {photo_name}")
+        await params.result_callback(None)
 
 
 async def store_user_feelings(params: FunctionCallParams):
     photo_name = params.arguments["photo_name"]
     feelings = params.arguments["feelings"]
-    # TODO Store user feelings and stories to a data storage
+
+    await params.llm.push_frame(TTSSpeakFrame(f"Storing feelings for this photo..."))
+
+    success = await photo_storage.add_feeling(photo_name, feelings)
+
+    if success:
+        logger.info(f"==== stored feelings for photo {photo_name}")
+        await params.result_callback(
+            {
+                "status": "success",
+                "message": f"Feelings stored for {photo_name}",
+            }
+        )
+    else:
+        logger.error(f"==== failed to store feelings for photo {photo_name}")
+        await params.result_callback(
+            {
+                "status": "error",
+                "message": f"Photo {photo_name} not found",
+            }
+        )
+
+
+async def generate_video(params: FunctionCallParams):
+    """Generate a memory video from stored photos and feelings."""
+    stats = photo_storage.get_stats()
+
+    logger.info(
+        f"==== generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings"
+    )
+
+    await params.llm.push_frame(
+        TTSSpeakFrame(
+            f"Generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings..."
+        )
+    )
+
+    # TODO: Implement actual video generation logic
+    # For now, return a placeholder response
+    await params.result_callback(
+        {
+            "status": "success",
+            "message": f"Memory video generated with {stats['total_photos']} photos",
+            "video_url": "https://placeholder-video-url.com/memory_video.mp4",
+        }
+    )
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -171,22 +224,23 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tools = ToolsSchema(
         standard_tools=[
+            get_photo_name_function,
             analyze_photo_function,
             store_user_feelings_function,
             generate_video_function,
         ]
     )
 
-    # llm.register...
+    # Register function handlers with LLM
+    llm.register_function("get_photo_name", get_photo_name)
+    llm.register_function("analyze_photo", analyze_photo)
+    llm.register_function("store_user_feelings", store_user_feelings)
+    llm.register_function("generate_video", generate_video)
 
     messages = [
         {
             "role": "system",
             "content": SYSTEM_INSTRUCTION,
-        },
-        {
-            "role": "assistant",
-            "content": "Hi! Welcome to Daily Diary. How was your day today?",
         },
     ]
 
@@ -224,15 +278,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
-        # Start the conversation with initial message
-        messages = [
-            {
-                "role": "user",
-                "content": "Hi!",
-            },
-        ]
-        context = OpenAILLMContext(messages=messages)
-        await task.queue_frames([OpenAILLMContextFrame(context=context)])
+        # context = OpenAILLMContext(messages=messages)
+        # await task.queue_frames([OpenAILLMContextFrame(context=context)])
+        await task.queue_frames(
+            [TTSSpeakFrame("Hi! Welcome to Daily Diary. How was your day today?")]
+        )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport: DailyTransport, participant):
