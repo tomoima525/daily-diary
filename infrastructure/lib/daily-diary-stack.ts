@@ -148,6 +148,7 @@ export class DailyDiaryStack extends cdk.Stack {
         memorySize: 512,
         environment: {
           VIDEO_GENERATOR_FUNCTION_NAME: videoGeneratorFunction.functionName,
+          S3_BUCKET_NAME: bucket.bucketName,
         },
         bundling: {
           externalModules: ["@aws-sdk/*"],
@@ -159,6 +160,9 @@ export class DailyDiaryStack extends cdk.Stack {
 
     // Grant permissions for video-api to invoke video-generator
     videoGeneratorFunction.grantInvoke(videoApiFunction);
+    
+    // Grant S3 read permissions to video-api for status checking
+    bucket.grantRead(videoApiFunction);
 
     // Create Function URL for video-api
     const videoApiFunctionUrl = videoApiFunction.addFunctionUrl({
@@ -166,7 +170,7 @@ export class DailyDiaryStack extends cdk.Stack {
       cors: {
         allowCredentials: false,
         allowedHeaders: ["Content-Type", "Authorization"],
-        allowedMethods: [lambda.HttpMethod.POST],
+        allowedMethods: [lambda.HttpMethod.GET, lambda.HttpMethod.POST],
         allowedOrigins: ["*"],
         maxAge: cdk.Duration.hours(1),
       },

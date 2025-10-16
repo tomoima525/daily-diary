@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyEventV2 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { S3Client, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
 
 interface PhotoMemory {
@@ -22,7 +23,16 @@ interface ApiResponse {
   message: string;
 }
 
+interface VideoStatusResponse {
+  isReady: boolean;
+  videoKey?: string;
+}
+
 const lambdaClient = new LambdaClient({
+  region: process.env.AWS_REGION,
+});
+
+const s3Client = new S3Client({
   region: process.env.AWS_REGION,
 });
 
@@ -30,8 +40,36 @@ const headers = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
 };
+
+async function checkVideoStatus(requestId: string): Promise<VideoStatusResponse> {
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) {
+    throw new Error("S3_BUCKET_NAME environment variable is not set");
+  }
+
+  const videoKey = `videos/vid_${requestId}.mp4`;
+  
+  try {
+    await s3Client.send(new HeadObjectCommand({
+      Bucket: bucketName,
+      Key: videoKey,
+    }));
+    
+    return {
+      isReady: true,
+      videoKey,
+    };
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return {
+        isReady: false,
+      };
+    }
+    throw error;
+  }
+}
 
 export const handler = async (
   event: APIGatewayProxyEvent | APIGatewayProxyEventV2
@@ -40,6 +78,7 @@ export const handler = async (
 
   // Handle both API Gateway v1 and v2 (Function URL) events
   const httpMethod = 'httpMethod' in event ? event.httpMethod : event.requestContext?.http?.method;
+  const path = 'path' in event ? event.path : event.requestContext?.http?.path || event.rawPath || '/';
   const body = event.body;
 
   if (httpMethod === "OPTIONS") {
@@ -50,12 +89,59 @@ export const handler = async (
     };
   }
 
+  // Handle GET requests for video status
+  if (httpMethod === "GET") {
+    const pathMatch = path.match(/^\/video\/([a-f0-9-]+)$/i);
+    if (!pathMatch) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: "Invalid path. Use /video/{requestId}",
+        }),
+      };
+    }
+
+    const requestId = pathMatch[1];
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(requestId)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: "Invalid request ID format",
+        }),
+      };
+    }
+
+    try {
+      const statusResponse = await checkVideoStatus(requestId);
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(statusResponse),
+      };
+    } catch (error) {
+      console.error("Error checking video status:", error);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: "Internal server error",
+          message: error instanceof Error ? error.message : "Unknown error occurred",
+        }),
+      };
+    }
+  }
+
   if (httpMethod !== "POST") {
     return {
       statusCode: 405,
       headers,
       body: JSON.stringify({
-        error: "Method not allowed. Only POST requests are supported.",
+        error: "Method not allowed. Only GET and POST requests are supported.",
       }),
     };
   }

@@ -213,7 +213,7 @@ export const handler: Handler<
     }
     const videoPath = path.join(tempDir, "memory_video.mp4");
     await generateVideo(generatedImages, videoPath);
-    const videoKey = `videos/${Date.now()}_memory_video.mp4`;
+    const videoKey = `videos/vid_${requestId}.mp4`;
     const videoUrl = await uploadVideoToS3(videoPath, bucketName, videoKey);
     fs.rmSync(tempDir, { recursive: true, force: true });
 
