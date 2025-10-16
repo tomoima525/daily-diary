@@ -4,6 +4,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
+import * as lambda from "aws-cdk-lib/aws-lambda";
 
 export class DailyDiaryStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -80,6 +81,24 @@ export class DailyDiaryStack extends cdk.Stack {
         }),
       },
     });
+
+    // FFmpeg Layer from S3
+    const ffmpegLayer = new lambda.LayerVersion(this, "ffmpeg-layer", {
+      layerVersionName: "ffmpeg-layer",
+
+      code: lambda.Code.fromBucket(
+        s3.Bucket.fromBucketName(
+          this,
+          "daily-diary-bucket",
+          "daily-diary-storage-bucket"
+        ),
+        "layers/ffmpeg-layer.zip"
+      ),
+      compatibleRuntimes: [lambda.Runtime.NODEJS_22_X],
+      description: "FFmpeg binary for audio/video processing",
+    });
+
+    // TODO: Lambda function to generate video
 
     // Output values for use in application
     new cdk.CfnOutput(this, "BucketName", {
