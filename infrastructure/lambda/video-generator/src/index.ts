@@ -1,6 +1,10 @@
 import { Handler } from "aws-lambda";
 import { GoogleGenAI } from "@google/genai";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -104,6 +108,40 @@ async function uploadVideoToS3(
   }
 }
 
+async function downloadImageFromS3(
+  bucketName: string,
+  key: string,
+  outputPath: string
+): Promise<void> {
+  const s3Client = new S3Client({});
+
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      })
+    );
+
+    if (!response.Body) {
+      throw new Error("No image data received from S3");
+    }
+
+    const chunks: Uint8Array[] = [];
+    const stream = response.Body as any;
+
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    const buffer = Buffer.concat(chunks);
+    fs.writeFileSync(outputPath, buffer);
+  } catch (error) {
+    console.error(`Error downloading image from S3: ${error}`);
+    throw new Error(`Failed to download image: ${error}`);
+  }
+}
+
 export const handler: Handler<
   VideoGenerationEvent,
   VideoGenerationResponse
@@ -123,11 +161,36 @@ export const handler: Handler<
     for (let i = 0; i < photo_memories.length; i++) {
       const memory = photo_memories[i];
 
-      const response = await ai.models.generateImages({
+      // Download original image from S3
+      const originalImagePath = path.join(
+        tempDir,
+        `${memory.photo_name}_original.jpg`
+      );
+      await downloadImageFromS3(
+        bucketName,
+        memory.photo_url,
+        originalImagePath
+      );
+
+      // Read the original image as base64
+      const originalImageBuffer = fs.readFileSync(originalImagePath);
+      const originalImageBase64 = originalImageBuffer.toString("base64");
+
+      const prompt = [
+        {
+          text: `Create an enhanced version of the provided image with a stylish text overlay caption. The caption should read a short phrase (max 12 words) that captures this feeling: "${memory.feelings}". Set Good contrast, and position the text beautifully on the image. Maintain the original photo's composition and lighting.`,
+        },
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: originalImageBase64,
+          },
+        },
+      ];
+      // Use Gemini to generate a new image with caption overlay
+      const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",
-        prompt: `Add a caption for the photo memory. The caption should be short (max 10 words), based on the photo and feelings. Change the tone of the caption based on the feelings.
-        Photo: ${memory.photo_url}
-        Feelings: ${memory.feelings}`,
+        contents: prompt,
       });
 
       const imagePath = path.join(
@@ -135,25 +198,18 @@ export const handler: Handler<
         `${memory.photo_name}_captioned.jpg`
       );
 
-      if (
-        response.generatedImages &&
-        response.generatedImages[0]?.image?.imageBytes
-      ) {
-        const imageData = response.generatedImages[0].image.imageBytes;
-        fs.writeFileSync(imagePath, Buffer.from(imageData, "base64"));
-      } else {
-        throw new Error(`Failed to generate image for ${memory.photo_name}`);
+      for (const part of response.candidates?.[0]?.content?.parts ?? []) {
+        if (part.inlineData?.data) {
+          const imageData = part.inlineData.data;
+          fs.writeFileSync(imagePath, Buffer.from(imageData, "base64"));
+          generatedImages.push(imagePath);
+        }
       }
-
-      generatedImages.push(imagePath);
     }
-
     const videoPath = path.join(tempDir, "memory_video.mp4");
     await generateVideo(generatedImages, videoPath);
-
     const videoKey = `videos/${Date.now()}_memory_video.mp4`;
     const videoUrl = await uploadVideoToS3(videoPath, bucketName, videoKey);
-
     fs.rmSync(tempDir, { recursive: true, force: true });
 
     return {
