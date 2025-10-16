@@ -115,7 +115,7 @@ async def store_user_feelings(params: FunctionCallParams):
     photo_name = params.arguments["photo_name"]
     feelings = params.arguments["feelings"]
 
-    await params.llm.push_frame(TTSSpeakFrame(f"Storing feelings for this photo..."))
+    await params.llm.push_frame(TTSSpeakFrame(f"Storing feelings for this photo."))
 
     success = await photo_storage.add_feeling(photo_name, feelings)
 
@@ -147,7 +147,7 @@ async def generate_video(params: FunctionCallParams):
 
     await params.llm.push_frame(
         TTSSpeakFrame(
-            f"Generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings..."
+            f"Generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings. Give me a second"
         )
     )
 
