@@ -136,7 +136,19 @@ export const handler = async (
     }
   }
 
-  if (httpMethod !== "POST") {
+  // Handle POST requests for video generation
+  if (httpMethod === "POST") {
+    // Check if path is /video
+    if (path !== "/video") {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: "Invalid path. Use /video for POST requests",
+        }),
+      };
+    }
+  } else {
     return {
       statusCode: 405,
       headers,
