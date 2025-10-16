@@ -1,0 +1,34 @@
+{
+  "photo_memories": [
+    {
+      "photo_name": "001",
+      "photo_url": "photos/001.jpg",
+      "feelings": "The venue is at Y Combinator, the most famous startup accelerator in the world."
+    },
+    {
+      "photo_name": "002",
+      "photo_url": "photos/002.jpg",
+      "feelings": "Excited to start the hackathon! We are going to build something amazing!"
+    },
+    {
+      "photo_name": "003",
+      "photo_url": "photos/003.jpg",
+      "feelings": "Deep in coding mode. The initial prototype is taking shape nicely."
+    },
+    {
+      "photo_name": "004",
+      "photo_url": "photos/004.jpg",
+      "feelings": "When I'm exhausted, I walked around and saw hackers grinding on their projects. It was inspiring to see their passion and dedication."
+    },
+    {
+      "photo_name": "005",
+      "photo_url": "photos/005.jpg",
+      "feelings": "At the venue, it was fun to see photos from great moments at YC. It was a great reminder that we are not alone in this journey."
+    },
+    {
+      "photo_name": "006",
+      "photo_url": "photos/006.jpg",
+      "feelings": "Final demo time. Everyone built something amazing"
+    }
+  ]
+}

@@ -5,6 +5,8 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { Effect } from "aws-cdk-lib/aws-iam";
 
 export class DailyDiaryStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -82,10 +84,17 @@ export class DailyDiaryStack extends cdk.Stack {
       },
     });
 
-    // FFmpeg Layer from S3
+    const secretManagerPolicy = new iam.PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: ["secretsmanager:GetSecretValue"],
+      resources: [
+        `arn:aws:secretsmanager:${this.region}:${this.account}:secret:*`,
+      ],
+    });
+
+    // FFmpeg Layer from S3 asset
     const ffmpegLayer = new lambda.LayerVersion(this, "ffmpeg-layer", {
       layerVersionName: "ffmpeg-layer",
-
       code: lambda.Code.fromBucket(
         s3.Bucket.fromBucketName(
           this,
@@ -93,12 +102,39 @@ export class DailyDiaryStack extends cdk.Stack {
           "daily-diary-storage-bucket"
         ),
         "layers/ffmpeg-layer.zip"
+        // TODO we should set the object version to the latest version of the layer. We need the version for S3 bucket
       ),
       compatibleRuntimes: [lambda.Runtime.NODEJS_22_X],
       description: "FFmpeg binary for audio/video processing",
     });
 
-    // TODO: Lambda function to generate video
+    // Video Generation Lambda Function
+    const videoGeneratorFunction = new NodejsFunction(
+      this,
+      "VideoGeneratorFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: "lambda/video-generator/src/index.ts",
+        timeout: cdk.Duration.minutes(15),
+        memorySize: 10240,
+        layers: [ffmpegLayer],
+        environment: {
+          S3_BUCKET_NAME: bucket.bucketName,
+          DAILY_DIARY_SECRET_ID: "daily-diary-secrets",
+        },
+        bundling: {
+          externalModules: ["@aws-sdk/*"],
+          minify: false,
+          sourceMap: true,
+        },
+      }
+    );
+
+    videoGeneratorFunction.addToRolePolicy(secretManagerPolicy);
+
+    // Grant S3 permissions to the video generator function
+    bucket.grantReadWrite(videoGeneratorFunction);
 
     // Output values for use in application
     new cdk.CfnOutput(this, "BucketName", {
@@ -114,6 +150,11 @@ export class DailyDiaryStack extends cdk.Stack {
     new cdk.CfnOutput(this, "BucketRegion", {
       value: this.region,
       description: "S3 bucket region",
+    });
+
+    new cdk.CfnOutput(this, "VideoGeneratorFunctionArn", {
+      value: videoGeneratorFunction.functionArn,
+      description: "Video generator Lambda function ARN",
     });
   }
 }

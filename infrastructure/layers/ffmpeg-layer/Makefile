@@ -13,4 +13,4 @@ build:
 	cd build/layer && zip -r ffmpeg-layer.zip bin
 	mv build/layer/ffmpeg-layer.zip .
 upload:
-	aws --profile $(PROFILE) s3 cp ffmpeg-layer.zip s3://voice-translator-123/layers/ffmpeg-layer.zip
+	aws --profile $(PROFILE) s3 cp ffmpeg-layer.zip s3://daily-diary-storage-bucket/layers/ffmpeg-layer.zip
