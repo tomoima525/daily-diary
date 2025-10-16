@@ -18,7 +18,6 @@ the conversation flow using Gemini's streaming capabilities.
 """
 
 import os
-from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -34,7 +33,6 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContext,
-    OpenAILLMContextFrame,
 )
 from pipecat.processors.frameworks.rtvi import (
     RTVIConfig,
@@ -177,10 +175,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        voice_id="cd17ff2d-5ea4-4695-be8f-42193949b946",  # Meditation lady
     )
 
-    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.0-flash-001")
+    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.5-flash")
 
     # Function calls
     get_photo_name_function = FunctionSchema(
@@ -278,8 +276,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
-        # context = OpenAILLMContext(messages=messages)
-        # await task.queue_frames([OpenAILLMContextFrame(context=context)])
         await task.queue_frames(
             [TTSSpeakFrame("Hi! Welcome to Daily Diary. How was your day today?")]
         )
