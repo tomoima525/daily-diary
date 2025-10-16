@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Screensharing with Voice UI Kit",
-  description: "Demonstrates screensharing capabilities with Voice UI Kit and Gemini Live Multimodal model",
+  title: "Daily Diary 📔",
+  description: "Talk and preserve your memorable moment",
 };
 
 export default function RootLayout({
