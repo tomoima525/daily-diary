@@ -8,9 +8,18 @@ import Image from "next/image";
 interface PhotoDisplayProps {
   photoUrl: string | null;
   onClear?: () => void;
+  size?: 'thumbnail' | 'full';
+  label?: string;
+  isAnalyzing?: boolean;
 }
 
-export function PhotoDisplay({ photoUrl, onClear }: PhotoDisplayProps) {
+export function PhotoDisplay({ 
+  photoUrl, 
+  onClear, 
+  size = 'full',
+  label,
+  isAnalyzing = false 
+}: PhotoDisplayProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -23,9 +32,15 @@ export function PhotoDisplay({ photoUrl, onClear }: PhotoDisplayProps) {
     return null;
   }
 
+  const sizeClasses = size === 'thumbnail' 
+    ? "w-32 h-32" 
+    : "w-full max-w-sm";
+  
+  const paddingClasses = size === 'thumbnail' ? "p-2" : "p-4";
+
   return (
-    <Card className="w-full max-w-sm">
-      <CardContent className="p-4">
+    <Card className={sizeClasses}>
+      <CardContent className={paddingClasses}>
         <div className="relative">
           <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden">
             {!hasError ? (
@@ -52,6 +67,15 @@ export function PhotoDisplay({ photoUrl, onClear }: PhotoDisplayProps) {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
               </div>
             )}
+            
+            {/* Analyzing overlay */}
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+                <div className="bg-white rounded-full p-2 shadow-md">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              </div>
+            )}
           </div>
           {onClear && (
             <Button
@@ -64,9 +88,20 @@ export function PhotoDisplay({ photoUrl, onClear }: PhotoDisplayProps) {
             </Button>
           )}
         </div>
-        <p className="text-sm text-gray-600 mt-2 text-center">
-          {hasError ? "Photo (Load Failed)" : "Uploaded Photo"}
-        </p>
+        {size === 'thumbnail' && label && (
+          <p className="text-xs text-gray-600 mt-1 text-center truncate" title={label}>
+            {isAnalyzing ? (
+              <span className="text-blue-600">Analyzing...</span>
+            ) : (
+              label
+            )}
+          </p>
+        )}
+        {size === 'full' && (
+          <p className="text-sm text-gray-600 mt-2 text-center">
+            {hasError ? "Photo (Load Failed)" : label || "Uploaded Photo"}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

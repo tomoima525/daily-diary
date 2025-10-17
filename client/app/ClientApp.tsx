@@ -254,10 +254,11 @@ export const ClientApp: React.FC<Props> = ({
           </div>
         </main>
       ) : (
-        <main className="flex-1 flex flex-col max-w-4xl mx-auto px-4 w-full">
-          {/* Voice Transcript Area - Top of Screen */}
-          <div className="flex-shrink-0 py-6">
-            <div className="relative w-full">
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 w-full py-6">
+            {/* Voice Transcript Area - Top of Screen */}
+            <div className="mb-6">
+              <div className="relative w-full">
               {/* Connection Status Indicator */}
               {!hasDisconnected && (
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
@@ -274,87 +275,69 @@ export const ClientApp: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Uploaded Photos List */}
-          {uploadedPhotos.length > 0 && (
-            <div className="flex-shrink-0 px-4 mb-4">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">
+            {/* Uploaded Photos Grid */}
+            {uploadedPhotos.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-4">
                   Uploaded Photos:
                 </h3>
-                <div className="space-y-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {uploadedPhotos.map((photo, index) => (
-                    <div
-                      key={index}
-                      className="text-sm text-gray-600 flex items-center gap-2"
-                    >
-                      {analyzingPhotoIndexes.has(index) ? (
-                        <>
-                          <div className="w-2 h-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                          <span>
-                            {photo.filename}{" "}
-                            <span className="text-blue-600">
-                              (Analyzing...)
-                            </span>
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
-                          {photo.filename}
-                        </>
-                      )}
+                    <div key={index} className="relative">
+                      <PhotoDisplay
+                        photoUrl={photo.url}
+                        size="thumbnail"
+                        label={photo.filename}
+                        isAnalyzing={analyzingPhotoIndexes.has(index)}
+                      />
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Generated Video Display */}
-          {videoUrl && (
-            <div className="flex-shrink-0 px-4 mb-4">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  Generated Video:
-                </h3>
-                <VideoDisplay videoUrl={videoUrl} />
-              </div>
-            </div>
-          )}
-
-          {/* Video Generation Status */}
-          {isVideoPolling && !videoUrl && (
-            <div className="flex-shrink-0 px-4 mb-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm text-blue-700">
-                    Generating video... This may take a few minutes.
-                  </span>
+            {/* Generated Video Display */}
+            {videoUrl && (
+              <div className="mb-6">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Generated Video:
+                  </h3>
+                  <VideoDisplay videoUrl={videoUrl} />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Video Generation Error */}
-          {videoError && (
-            <div className="flex-shrink-0 px-4 mb-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-red-700">
-                    Video generation failed: {videoError}
-                  </span>
+            {/* Video Generation Status */}
+            {isVideoPolling && !videoUrl && (
+              <div className="mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-blue-700">
+                      Generating video... This may take a few minutes.
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Spacer to push components to bottom */}
-          <div className="flex-1"></div>
+            {/* Video Generation Error */}
+            {videoError && (
+              <div className="mb-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-red-700">
+                      Video generation failed: {videoError}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
-          {/* Bottom Components - Fixed Section */}
-          <div className="flex-shrink-0 border-t border-gray-200 pt-6 pb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Bottom Components */}
+            <div className="border-t border-gray-200 pt-6 pb-8 mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Controls Panel */}
               <Card>
                 <CardContent className="p-4">
@@ -382,6 +365,7 @@ export const ClientApp: React.FC<Props> = ({
                   </CardContent>
                 </Card>
               )}
+              </div>
             </div>
           </div>
         </main>
