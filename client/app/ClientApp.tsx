@@ -259,39 +259,54 @@ export const ClientApp: React.FC<Props> = ({
             {/* Voice Transcript Area - Top of Screen */}
             <div className="mb-6">
               <div className="relative w-full">
-              {/* Connection Status Indicator */}
-              {!hasDisconnected && (
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              )}
+                {/* Connection Status Indicator */}
+                {!hasDisconnected && (
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                )}
 
-              {/* Transcript Box */}
-              <div className="border border-gray-300 rounded-lg p-6 pl-12 bg-white min-h-[120px] flex items-center">
-                <CustomTranscriptOverlay
-                  participant="remote"
-                  className="w-full text-left pl-6"
-                  size="lg"
-                />
+                {/* Transcript Box */}
+                <div className="border border-gray-300 rounded-lg p-6 pl-12 bg-white min-h-[120px] flex items-center">
+                  <CustomTranscriptOverlay
+                    participant="remote"
+                    className="w-full text-left pl-6"
+                    size="lg"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-            {/* Uploaded Photos Grid */}
+            {/* Uploaded Photos */}
             {uploadedPhotos.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-700 mb-4">
                   Uploaded Photos:
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {uploadedPhotos.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <PhotoDisplay
-                        photoUrl={photo.url}
-                        size="thumbnail"
-                        label={photo.filename}
-                        isAnalyzing={analyzingPhotoIndexes.has(index)}
-                      />
-                    </div>
-                  ))}
+                <div className="space-y-4 grid grid-cols-3 gap-2">
+                  {uploadedPhotos.map((photo, index) => {
+                    const isAnalyzing = analyzingPhotoIndexes.has(index);
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg bg-gray-50"
+                      >
+                        <PhotoDisplay photoUrl={photo.url} />
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {photo.filename}
+                          </p>
+                          {isAnalyzing && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm text-blue-600 font-medium">
+                                Analyzing
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -338,33 +353,33 @@ export const ClientApp: React.FC<Props> = ({
             {/* Bottom Components */}
             <div className="border-t border-gray-200 pt-6 pb-8 mt-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Controls Panel */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <UserAudioControl visualizerProps={{ barCount: 5 }} />
-                    <PhotoUpload
-                      onUpload={handlePhotoUpload}
-                      onUploadComplete={handleUploadComplete}
-                      roomId={roomId}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Event Logs Panel */}
-              {showLogs && (
+                {/* Controls Panel */}
                 <Card>
                   <CardContent className="p-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Event Logs
-                    </h3>
-                    <div className="h-32 overflow-auto">
-                      <EventStreamPanel />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <UserAudioControl visualizerProps={{ barCount: 5 }} />
+                      <PhotoUpload
+                        onUpload={handlePhotoUpload}
+                        onUploadComplete={handleUploadComplete}
+                        roomId={roomId}
+                      />
                     </div>
                   </CardContent>
                 </Card>
-              )}
+
+                {/* Event Logs Panel */}
+                {showLogs && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">
+                        Event Logs
+                      </h3>
+                      <div className="h-32 overflow-auto">
+                        <EventStreamPanel />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           </div>
