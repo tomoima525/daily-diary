@@ -1,20 +1,24 @@
-# Daily Diary - AI-Powered Photo Memory Assistant
+# 🎬 Daily Diary — AI That Turns Your Daily day into a beutiful memory
 
 ## What is this?
 
-Daily Diary is an intelligent photo memory assistant that combines real-time voice conversation with visual analysis. Upload photos and engage in meaningful conversations about your memories while the AI analyzes your images and asks thoughtful questions to help you reflect on your experiences.
+Daily Diary lets users create short daily videos just by talking.
+Before bed, you tell the AI about your day — it listens, understands the story, finds related photos and videos, adds narration and music, and produces a short “memory movie.”
+It captures not only what happened, but how it felt.
+
+## How does it work?
+
+It is an intelligent photo memory assistant that combines real-time voice conversation with visual analysis. Upload photos and engage in meaningful conversations about your memories while the AI analyzes your images and asks thoughtful questions to help you reflect on your experiences.
 
 ## Demo Video
 
-![Capture of the running demo](./capture.gif)
-
-*Less than 60 seconds demo showing photo upload, AI analysis, and voice conversation about memories*
+https://github.com/user-attachments/assets/ab60d587-cacd-4300-9851-72a9d876d86d
 
 ## How Gemini models and Pipecat used
 
 **Gemini Integration:**
-- **Gemini 2.5 gemini-2.5-flash-native-audio** for real-time voice conversations via Pipecat's Gemini Live integration
-- **Gemini 2.0 Flash Experimental** for intelligent photo analysis, generating empathetic responses about user memories
+- **Gemini 2.5 gemini-2.5-flash** for real-time voice conversations via Pipecat's Gemini Live integration
+- **Gemini 2.5 gemini-2.5-flash-image** for intelligent photo analysis, generating empathetic responses about user memories
 - Custom prompts designed for emotional understanding and memory exploration
 
 **Pipecat Integration:**
