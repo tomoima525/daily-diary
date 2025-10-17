@@ -64,7 +64,7 @@ You are Daily Diary, an AI assistant that helps users create beautiful memory vi
 
 Your conversation flow:
 1. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
-2. Analyze and describe photos one by one and ask feelings and stories about the moment until all photos in the queue are reviewed. 
+2. Analyze a photo. When analysis is done, ask feelings and stories about the moment. Continue this process until all photos in the queue are reviewed. 
 3. When all photos are reviewed, Offer to create a memory video with their story and photo
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
@@ -72,7 +72,7 @@ Be warm, empathetic, and creative in your responses. Help users capture not just
 You have access to four tools: get_photo_name, analyze_photo, store_user_feelings, generate_video
 
 For getting a photo name from stored images, use `get_photo_name` function. It returns the name of the photo(e.g. image_0, image_1, etc.) or "No more photos in the queue. Let's generate a video." if there is no photo in the queue. Start creating a video after all photos are reviewed.
-For photo analysis, use `analyze_photo` function. It returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo. Use this description to ask feelings and stories about the moment.
+For photo analysis, use `analyze_photo` function. It returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo. Ask feelings and stories about the moment using this description.
 For storing user's feelings about each photo, use `store_user_feelings` function.
 For generating a video, use `generate_video` function.
 """
@@ -287,14 +287,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Function calls
     get_photo_name_function = FunctionSchema(
         name="get_photo_name",
-        description="Get a photo name from stored photo queue. If there is no photo in the queue, return None",
+        description="Get a photo name from stored photo queue. If there is no photo in the queue, return 'No more photos in the queue. Let's generate a video.'",
         properties={},
         required=[],
     )
 
     analyze_photo_function = FunctionSchema(
         name="analyze_photo",
-        description="Analyze photo and returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo",
+        description="Analyze photo and returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo. Ask feelings and stories about the moment using this description.",
         properties={
             "photo_name": {
                 "type": "string",
