@@ -35,12 +35,37 @@ import { PhotoDisplay } from "./components/PhotoDisplay";
 import Image from "next/image";
 import { CustomTranscriptOverlay } from "./components/CustomTextOverlay";
 import { RTVIEvent, ServerMessageData } from "@pipecat-ai/client-js";
+import { useVideoPolling } from "./hooks/useVideoPolling";
 
 interface Props {
   connect?: () => void | Promise<void>;
   disconnect?: () => void | Promise<void>;
   isMobile: boolean;
 }
+
+interface VideoGenerationStartedPayload {
+  request_id: string;
+}
+
+interface PhotoAnalysisPayload {
+  photo_name: string;
+}
+
+type ServerMessageType =
+  | "video_generation_started"
+  | "photo_analysis_started"
+  | "photo_analysis_completed";
+
+interface ServerMessageEvent {
+  type: ServerMessageType;
+  payload: VideoGenerationStartedPayload | PhotoAnalysisPayload;
+}
+
+// Helper function to extract index from photo name (e.g., "image_0" -> 0)
+const extractPhotoIndex = (photoName: string): number | null => {
+  const match = photoName.match(/image_(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+};
 
 export const ClientApp: React.FC<Props> = ({
   connect,
@@ -56,68 +81,61 @@ export const ClientApp: React.FC<Props> = ({
   const [uploadedPhotos, setUploadedPhotos] = useState<
     Array<{ filename: string; url: string }>
   >([]);
-  const [generatedVideo, setGeneratedVideo] = useState<{
-    url: string;
-    requestId: string;
-  } | null>(null);
-  const [videoPolling, setVideoPolling] = useState<{
-    requestId: string;
-    intervalId: NodeJS.Timeout;
-  } | null>(null);
+  const [videoRequestId, setVideoRequestId] = useState<string | null>(null);
+  const [analyzingPhotoIndexes, setAnalyzingPhotoIndexes] = useState<
+    Set<number>
+  >(new Set());
+
+  // Use the custom hook for video polling
+  const {
+    videoUrl,
+    isPolling: isVideoPolling,
+    error: videoError,
+  } = useVideoPolling(videoRequestId);
 
   useRTVIClientEvent(
     RTVIEvent.ServerMessage,
-    useCallback((event: ServerMessageData) => {
+    useCallback((event: ServerMessageEvent) => {
       console.log("Server message received:", event);
-      if (
-        event.data?.type === "video_generation_started" &&
-        event.data?.payload?.request_id
-      ) {
-        const requestId = event.data?.payload?.request_id;
-        
-        // Clear any existing polling
-        if (videoPolling) {
-          clearInterval(videoPolling.intervalId);
+      switch (event?.type as ServerMessageType) {
+        case "video_generation_started": {
+          const videoGenerationStartedPayload =
+            event?.payload as VideoGenerationStartedPayload;
+          const requestId = videoGenerationStartedPayload.request_id;
+          console.log("Video generation started with request ID:", requestId);
+          setVideoRequestId(requestId);
+          break;
         }
-        
-        // Start polling for video generation status
-        const pollVideoGenerationStatus = async () => {
-          try {
-            const response = await fetch(`/api/video/${requestId}`);
-            const data = await response.json();
-            console.log("Video generation status:", data);
-            
-            if (data.isReady && data.videoKey) {
-              // Get presigned URL for the video
-              const presignedResponse = await fetch(`/api/video/presigned/${data.videoKey}`);
-              const presignedData = await presignedResponse.json();
-              
-              if (presignedData.presignedUrl) {
-                setGeneratedVideo({
-                  url: presignedData.presignedUrl,
-                  requestId,
-                });
-                
-                // Stop polling
-                if (videoPolling?.intervalId) {
-                  clearInterval(videoPolling.intervalId);
-                  setVideoPolling(null);
-                }
-              }
-            }
-          } catch (error) {
-            console.error("Error polling video status:", error);
+        case "photo_analysis_started": {
+          const photoAnalysisStartedPayload =
+            event?.payload as PhotoAnalysisPayload;
+          const photoName = photoAnalysisStartedPayload.photo_name;
+          console.log("Photo analysis started for photo:", photoName);
+
+          const index = extractPhotoIndex(photoName);
+          if (index !== null) {
+            setAnalyzingPhotoIndexes((prev) => new Set(prev).add(index));
           }
-        };
-        
-        // Start polling every 5 seconds
-        const intervalId = setInterval(pollVideoGenerationStatus, 5000);
-        setVideoPolling({ requestId, intervalId });
-        
-        // Also check immediately
-        pollVideoGenerationStatus();
+          break;
+        }
+        case "photo_analysis_completed": {
+          const photoAnalysisCompletedPayload =
+            event?.payload as PhotoAnalysisPayload;
+          const photoName = photoAnalysisCompletedPayload.photo_name;
+          console.log("Photo analysis completed for photo:", photoName);
+
+          const index = extractPhotoIndex(photoName);
+          if (index !== null) {
+            setAnalyzingPhotoIndexes((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(index);
+              return newSet;
+            });
+          }
+          break;
+        }
       }
-    }, [videoPolling])
+    }, [])
   );
   useEffect(() => {
     if (hasDisconnected) return;
@@ -125,15 +143,6 @@ export const ClientApp: React.FC<Props> = ({
       client.initDevices();
     }
   }, [client, hasDisconnected, isDisconnected]);
-
-  // Cleanup polling on component unmount
-  useEffect(() => {
-    return () => {
-      if (videoPolling?.intervalId) {
-        clearInterval(videoPolling.intervalId);
-      }
-    };
-  }, [videoPolling]);
 
   // Capture room ID when client connects
   useEffect(() => {
@@ -225,7 +234,7 @@ export const ClientApp: React.FC<Props> = ({
                   onClick={handleToggleLogs}
                   className="px-4 py-2 text-gray-900 border-gray-300 hover:bg-gray-50"
                 >
-                  Log
+                  <Logs />
                 </Button>
               </div>
             )}
@@ -278,8 +287,22 @@ export const ClientApp: React.FC<Props> = ({
                       key={index}
                       className="text-sm text-gray-600 flex items-center gap-2"
                     >
-                      <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
-                      {photo.filename}
+                      {analyzingPhotoIndexes.has(index) ? (
+                        <>
+                          <div className="w-2 h-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                          <span>
+                            {photo.filename}{" "}
+                            <span className="text-blue-600">
+                              (Analyzing...)
+                            </span>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+                          {photo.filename}
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -288,25 +311,38 @@ export const ClientApp: React.FC<Props> = ({
           )}
 
           {/* Generated Video Display */}
-          {generatedVideo && (
+          {videoUrl && (
             <div className="flex-shrink-0 px-4 mb-4">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
                   Generated Video:
                 </h3>
-                <VideoDisplay videoUrl={generatedVideo.url} />
+                <VideoDisplay videoUrl={videoUrl} />
               </div>
             </div>
           )}
 
           {/* Video Generation Status */}
-          {videoPolling && !generatedVideo && (
+          {isVideoPolling && !videoUrl && (
             <div className="flex-shrink-0 px-4 mb-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   <span className="text-sm text-blue-700">
                     Generating video... This may take a few minutes.
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Video Generation Error */}
+          {videoError && (
+            <div className="flex-shrink-0 px-4 mb-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-red-700">
+                    Video generation failed: {videoError}
                   </span>
                 </div>
               </div>
