@@ -27,7 +27,7 @@ import {
   UserVideoControl,
 } from "@pipecat-ai/voice-ui-kit";
 import React, { useCallback, useEffect, useState } from "react";
-import { Logs, MonitorOff } from "lucide-react";
+import { Logs, MonitorOff, Download } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
 import { PhotoUpload } from "./components/PhotoUpload";
 import { VideoDisplay } from "./components/VideoDisplay";
@@ -199,6 +199,17 @@ export const ClientApp: React.FC<Props> = ({
     });
   };
 
+  const handleDownloadVideo = () => {
+    if (!videoUrl) return;
+    
+    const link = document.createElement('a');
+    link.href = videoUrl;
+    link.download = `daily-diary-${new Date().toISOString().split('T')[0]}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (!client) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -315,9 +326,20 @@ export const ClientApp: React.FC<Props> = ({
             {videoUrl && (
               <div className="mb-6">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
-                    Generated Video:
-                  </h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-medium text-gray-700">
+                      Generated Video:
+                    </h3>
+                    <Button
+                      onClick={handleDownloadVideo}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Video
+                    </Button>
+                  </div>
                   <VideoDisplay videoUrl={videoUrl} />
                 </div>
               </div>
