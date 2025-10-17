@@ -120,6 +120,17 @@ async def analyze_photo(params: FunctionCallParams):
                 "description": description,
             }
         )
+        await params.llm.queue_frame(
+            RTVIServerMessageFrame(
+                data={
+                    "type": "photo_analysis_completed",
+                    "payload": {
+                        "photo_name": photo_name,
+                    },
+                }
+            ),
+            direction=FrameDirection.UPSTREAM,
+        )
     else:
         logger.info(f"==== no more images in the queue")
 
