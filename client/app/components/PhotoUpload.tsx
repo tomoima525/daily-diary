@@ -5,7 +5,7 @@ import { Upload } from "lucide-react";
 import { Button } from "@pipecat-ai/voice-ui-kit";
 
 interface PhotoUploadProps {
-  onUpload: (url: string) => void;
+  onUpload: (url: string, filename?: string) => void;
   onUploadComplete?: (fileKey: string) => void;
   roomId: string | null;
 }
@@ -60,7 +60,7 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
       }
 
       console.log(`File uploaded successfully: ${key}`);
-      onUpload(fileUrl);
+      onUpload(fileUrl, file.name);
       
       // Notify agent that upload is complete
       if (onUploadComplete) {

@@ -52,7 +52,9 @@ export const ClientApp: React.FC<Props> = ({
   const [hasDisconnected, setHasDisconnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
+  const [uploadedPhotos, setUploadedPhotos] = useState<
+    Array<{ filename: string; url: string }>
+  >([]);
 
   useEffect(() => {
     if (hasDisconnected) return;
@@ -93,17 +95,9 @@ export const ClientApp: React.FC<Props> = ({
     };
   }, [client]);
 
-  const handleConnect = async () => {
-    try {
-      connect?.();
-    } catch (error) {
-      console.error("Connection error:", error);
-    }
-  };
-
   const handleDisconnect = async () => {
+    await disconnect?.();
     setHasDisconnected(true);
-    disconnect?.();
   };
 
   const [showLogs, setShowLogs] = useState(false);
@@ -111,8 +105,10 @@ export const ClientApp: React.FC<Props> = ({
     setShowLogs((prev) => !prev);
   };
 
-  const handlePhotoUpload = (url: string) => {
-    setUploadedPhotoUrl(url);
+  const handlePhotoUpload = (url: string, filename?: string) => {
+    if (filename) {
+      setUploadedPhotos((prev) => [...prev, { filename, url }]);
+    }
   };
 
   const handleUploadComplete = (fileKey: string) => {
@@ -196,6 +192,28 @@ export const ClientApp: React.FC<Props> = ({
               </div>
             </div>
           </div>
+
+          {/* Uploaded Photos List */}
+          {uploadedPhotos.length > 0 && (
+            <div className="flex-shrink-0 px-4 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">
+                  Uploaded Photos:
+                </h3>
+                <div className="space-y-1">
+                  {uploadedPhotos.map((photo, index) => (
+                    <div
+                      key={index}
+                      className="text-sm text-gray-600 flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+                      {photo.filename}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Spacer to push components to bottom */}
           <div className="flex-1"></div>
