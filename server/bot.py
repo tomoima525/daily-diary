@@ -27,7 +27,7 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import LLMMessagesUpdateFrame, TTSSpeakFrame
+from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -108,7 +108,18 @@ async def analyze_photo(params: FunctionCallParams):
         )
     else:
         logger.error(f"==== no image found for photo_name {photo_name}")
-        await params.result_callback(None)
+        # Add a
+        await params.llm.push_frame(
+            LLMMessagesAppendFrame(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "We reviewed all photos. You can now generate a video.",
+                    }
+                ],
+                run_llm=True,
+            )
+        )
 
 
 async def store_user_feelings(params: FunctionCallParams):
