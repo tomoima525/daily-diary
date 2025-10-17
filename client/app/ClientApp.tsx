@@ -56,6 +56,14 @@ export const ClientApp: React.FC<Props> = ({
   const [uploadedPhotos, setUploadedPhotos] = useState<
     Array<{ filename: string; url: string }>
   >([]);
+  const [generatedVideo, setGeneratedVideo] = useState<{
+    url: string;
+    requestId: string;
+  } | null>(null);
+  const [videoPolling, setVideoPolling] = useState<{
+    requestId: string;
+    intervalId: NodeJS.Timeout;
+  } | null>(null);
 
   useRTVIClientEvent(
     RTVIEvent.ServerMessage,
@@ -65,16 +73,51 @@ export const ClientApp: React.FC<Props> = ({
         event.data?.type === "video_generation_started" &&
         event.data?.payload?.request_id
       ) {
-        // Start polling for video generation status
         const requestId = event.data?.payload?.request_id;
+        
+        // Clear any existing polling
+        if (videoPolling) {
+          clearInterval(videoPolling.intervalId);
+        }
+        
+        // Start polling for video generation status
         const pollVideoGenerationStatus = async () => {
-          const response = await fetch(`/api/video/${requestId}`);
-          const data = await response.json();
-          console.log("Video generation status:", data);
+          try {
+            const response = await fetch(`/api/video/${requestId}`);
+            const data = await response.json();
+            console.log("Video generation status:", data);
+            
+            if (data.isReady && data.videoKey) {
+              // Get presigned URL for the video
+              const presignedResponse = await fetch(`/api/video/presigned/${data.videoKey}`);
+              const presignedData = await presignedResponse.json();
+              
+              if (presignedData.presignedUrl) {
+                setGeneratedVideo({
+                  url: presignedData.presignedUrl,
+                  requestId,
+                });
+                
+                // Stop polling
+                if (videoPolling?.intervalId) {
+                  clearInterval(videoPolling.intervalId);
+                  setVideoPolling(null);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error polling video status:", error);
+          }
         };
-        setInterval(pollVideoGenerationStatus, 5000);
+        
+        // Start polling every 5 seconds
+        const intervalId = setInterval(pollVideoGenerationStatus, 5000);
+        setVideoPolling({ requestId, intervalId });
+        
+        // Also check immediately
+        pollVideoGenerationStatus();
       }
-    }, [])
+    }, [videoPolling])
   );
   useEffect(() => {
     if (hasDisconnected) return;
@@ -82,6 +125,15 @@ export const ClientApp: React.FC<Props> = ({
       client.initDevices();
     }
   }, [client, hasDisconnected, isDisconnected]);
+
+  // Cleanup polling on component unmount
+  useEffect(() => {
+    return () => {
+      if (videoPolling?.intervalId) {
+        clearInterval(videoPolling.intervalId);
+      }
+    };
+  }, [videoPolling]);
 
   // Capture room ID when client connects
   useEffect(() => {
@@ -230,6 +282,32 @@ export const ClientApp: React.FC<Props> = ({
                       {photo.filename}
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Generated Video Display */}
+          {generatedVideo && (
+            <div className="flex-shrink-0 px-4 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Generated Video:
+                </h3>
+                <VideoDisplay videoUrl={generatedVideo.url} />
+              </div>
+            </div>
+          )}
+
+          {/* Video Generation Status */}
+          {videoPolling && !generatedVideo && (
+            <div className="flex-shrink-0 px-4 mb-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm text-blue-700">
+                    Generating video... This may take a few minutes.
+                  </span>
                 </div>
               </div>
             </div>
