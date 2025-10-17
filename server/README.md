@@ -32,19 +32,7 @@ A Pipecat server implementing Google's Gemini Live Multimodal model for real-tim
 
 ## Required API Keys
 
-Set these in your `.env` file:
-
-```ini
-DAILY_API_KEY=your_daily_api_key
-GOOGLE_API_KEY=your_google_gemini_api_key
-```
-
-### Optional Configuration
-
-```ini
-DAILY_SAMPLE_ROOM_URL=https://yourdomain.daily.co/yourroom  # For local dev
-DAILY_SAMPLE_ROOM_TOKEN=your_room_token                     # If room requires token
-```
+Copy `env.example` to `.env` and set the API keys. You need AWS credentials to upload photos to S3.
 
 ## Bot Behavior
 

@@ -1,8 +1,9 @@
-agent_name = "gemini-screen-ui-kit"
-image = "cstuffdaily/gemini-screen-ui-kit:0.1"
-secret_set = "gemini-screen-ui-kit-secrets"
-agent_profile = "agent-2x"
+agent_name = "daily-diary-agent"
+image = "tomoima525/daily-diary-agent:0.2"
+secret_set = "daily-diary-agent-secrets"
 enable_krisp = true
+image_credentials = "tomo-image-pull-secret"
 
 [scaling]
-	min_agents = 1
+	min_agents = 0
+	max_agents = 3

@@ -14,3 +14,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy the application code
 COPY ./bot.py bot.py
+COPY ./image_analyzer.py image_analyzer.py
+COPY ./photo_memory_storage.py photo_memory_storage.py
+COPY ./user_message_processor.py user_message_processor.py
+COPY ./s3_manager.py s3_manager.py
