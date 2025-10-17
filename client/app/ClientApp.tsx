@@ -134,8 +134,8 @@ export const ClientApp: React.FC<Props> = ({
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="bg-white border-b border-gray-200">
+    <div className="h-screen bg-white flex flex-col">
+      <header className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
@@ -166,7 +166,7 @@ export const ClientApp: React.FC<Props> = ({
       </header>
 
       {hasDisconnected ? (
-        <main className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+        <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">
               Disconnected. See you next time!
@@ -177,9 +177,9 @@ export const ClientApp: React.FC<Props> = ({
           </div>
         </main>
       ) : (
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          {/* Main Transcript Area */}
-          <div className="flex items-center justify-center min-h-[400px] mb-8">
+        <main className="flex-1 flex flex-col max-w-4xl mx-auto px-4 w-full">
+          {/* Voice Transcript Area - Top of Screen */}
+          <div className="flex-shrink-0 py-6">
             <div className="relative w-full">
               {/* Connection Status Indicator */}
               {!hasDisconnected && (
@@ -197,8 +197,11 @@ export const ClientApp: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Bottom Components - Collapsible Section */}
-          <div className="border-t border-gray-200 pt-6">
+          {/* Spacer to push components to bottom */}
+          <div className="flex-1"></div>
+
+          {/* Bottom Components - Fixed Section */}
+          <div className="flex-shrink-0 border-t border-gray-200 pt-6 pb-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Controls Panel */}
               <Card>
