@@ -1,4 +1,4 @@
-# 🎬 Daily Diary — AI That Turns Your Daily day into a beutiful memory
+# 🎬 Daily Diary — AI That Turns Your Daily day into a beautiful memory
 
 https://github.com/user-attachments/assets/ab60d587-cacd-4300-9851-72a9d876d86d
 
