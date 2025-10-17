@@ -48,13 +48,20 @@ export const useVideoPolling = (requestId: string | null) => {
     const intervalId = setInterval(pollVideoGenerationStatus, 5000);
 
     // Also check immediately
-    pollVideoGenerationStatus();
+    if (isPolling) {
+      pollVideoGenerationStatus();
+    } else {
+      setIsPolling(false);
+      setVideoUrl(null);
+      setError(null);
+      clearInterval(intervalId);
+    }
 
     // Cleanup function
     return () => {
       clearInterval(intervalId);
     };
-  }, [requestId]);
+  }, [requestId, isPolling]);
 
   return { videoUrl, isPolling, error };
 };
