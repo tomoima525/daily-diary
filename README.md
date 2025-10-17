@@ -1,5 +1,7 @@
 # 🎬 Daily Diary — AI That Turns Your Daily day into a beutiful memory
 
+https://github.com/user-attachments/assets/ab60d587-cacd-4300-9851-72a9d876d86d
+
 ## What is this?
 
 Daily Diary lets users create short daily videos just by talking.
@@ -10,9 +12,13 @@ It captures not only what happened, but how it felt.
 
 It is an intelligent photo memory assistant that combines real-time voice conversation with visual analysis. Upload photos and engage in meaningful conversations about your memories while the AI analyzes your images and asks thoughtful questions to help you reflect on your experiences.
 
-## Demo Video
+## Out put video
 
-https://github.com/user-attachments/assets/ab60d587-cacd-4300-9851-72a9d876d86d
+I took photos at the hackathon and made this video using Daily diary
+
+https://github.com/user-attachments/assets/9bb700e0-71cf-4100-bad6-d76fea995db8
+
+
 
 ## How Gemini models and Pipecat used
 
