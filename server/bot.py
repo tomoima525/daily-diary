@@ -17,13 +17,13 @@ The bot runs as part of a pipeline that processes audio/video frames and manages
 the conversation flow using Gemini's streaming capabilities.
 """
 
+import asyncio
 import json
 import os
 
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from PIL import Image
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -36,6 +36,7 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContext,
 )
+from pipecat.processors.frame_processor import FrameDirection
 from pipecat.processors.frameworks.rtvi import (
     RTVIConfig,
     RTVIObserver,
@@ -62,16 +63,16 @@ SYSTEM_INSTRUCTION = f"""
 You are Daily Diary, an AI assistant that helps users create beautiful memory videos from their daily stories.
 
 Your conversation flow:
-3. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
-4. Analyze photos one by one and ask feelings and stories about the moment until all photos in the queue are reviewed. 
-5. When all photos are reviewed, Offer to create a memory video with their story and photo
+1. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
+2. Analyze and describe photos one by one and ask feelings and stories about the moment until all photos in the queue are reviewed. 
+3. When all photos are reviewed, Offer to create a memory video with their story and photo
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
 
 You have access to four tools: get_photo_name, analyze_photo, store_user_feelings, generate_video
 
-For getting a photo name from stored images, use `get_photo_name` function. It will return the name of the photo(e.g. image_0, image_1, etc.) or None if there is no photo in the queue.
-For photo analysis, use `analyze_photo` function. It will return the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo.
+For getting a photo name from stored images, use `get_photo_name` function. It returns the name of the photo(e.g. image_0, image_1, etc.) or "No more photos in the queue. Let's generate a video." if there is no photo in the queue. Start creating a video after all photos are reviewed.
+For photo analysis, use `analyze_photo` function. It returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo. Use this description to ask feelings and stories about the moment.
 For storing user's feelings about each photo, use `store_user_feelings` function.
 For generating a video, use `generate_video` function.
 """
@@ -89,18 +90,30 @@ async def get_photo_name(params: FunctionCallParams):
         await params.result_callback(photo_name)
     else:
         logger.info(f"No photo in the queue")
-        await params.result_callback(None)
+        await params.result_callback("No more photos in the queue. Let's generate a video.")
 
 
 async def analyze_photo(params: FunctionCallParams):
     photo_name = params.arguments["photo_name"]
     image = photo_storage.get_photo_image(photo_name)
-
+    logger.info(f"==== image {image}")
     if image:
         logger.info(f"==== analyzing photo {photo_name} with size {image.size}")
-        await params.llm.push_frame(TTSSpeakFrame(f"Give me a sec, analyzing your photo"))
+        await params.llm.queue_frame(
+            RTVIServerMessageFrame(
+                data={
+                    "type": "photo_analysis_started",
+                    "payload": {
+                        "photo_name": photo_name,
+                    },
+                }
+            ),
+            direction=FrameDirection.UPSTREAM,
+        )
+        await params.llm.push_frame(TTSSpeakFrame(f"Give me a sec, analyzing your photo."))
+        # Wait for 0.5 second to push frame
+        await asyncio.sleep(0.5)
         description = await image_analyzer.analyze_and_respond(image)
-        logger.info(f"==== description {description}")
         await params.result_callback(
             {
                 "photo_name": photo_name,
@@ -108,26 +121,12 @@ async def analyze_photo(params: FunctionCallParams):
             }
         )
     else:
-        logger.error(f"==== no image found for photo_name {photo_name}")
-        # Add a
-        await params.llm.push_frame(
-            LLMMessagesAppendFrame(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "We reviewed all photos. You can now generate a video.",
-                    }
-                ],
-                run_llm=True,
-            )
-        )
+        logger.info(f"==== no more images in the queue")
 
 
 async def store_user_feelings(params: FunctionCallParams):
     photo_name = params.arguments["photo_name"]
     feelings = params.arguments["feelings"]
-
-    await params.llm.push_frame(TTSSpeakFrame(f"Storing feelings for this photo."))
 
     success = await photo_storage.add_feeling(photo_name, feelings)
 
@@ -182,7 +181,7 @@ async def generate_video(params: FunctionCallParams):
 
     await params.llm.push_frame(
         TTSSpeakFrame(
-            f"Generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings. Give me a second"
+            f"Generating video with {stats['total_photos']} photos and {stats['total_feelings']} feelings. Give me a second."
         )
     )
 
@@ -216,7 +215,7 @@ async def generate_video(params: FunctionCallParams):
                     request_id = result.get("requestId")
                     logger.info(f"==== Video generation started with requestId: {request_id}")
                     # Send ServerMessageFrame to the client
-                    await params.llm.push_frame(
+                    await params.llm.queue_frame(
                         RTVIServerMessageFrame(
                             data={
                                 "type": "video_generation_started",
@@ -224,7 +223,8 @@ async def generate_video(params: FunctionCallParams):
                                     "request_id": request_id,
                                 },
                             }
-                        )
+                        ),
+                        direction=FrameDirection.UPSTREAM,
                     )
 
                     await params.result_callback(
@@ -371,12 +371,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await rtvi.set_bot_ready()
         # Start the conversation
         # Kick off the conversation with a styled introduction
-        messages.append(
-            {
-                "role": "system",
-                "content": "Start the conversation with introduction",
-            }
-        )
+        # messages.append(
+        #     {
+        #         "role": "system",
+        #         "content": "Start the conversation with introduction",
+        #     }
+        # )
         await task.queue_frames(
             [
                 LLMMessagesUpdateFrame(
