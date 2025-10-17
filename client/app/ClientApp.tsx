@@ -19,6 +19,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  TranscriptOverlay,
   usePipecatConnectionState,
   UserAudioControl,
   UserScreenControl,
@@ -31,6 +32,7 @@ import { PhotoUpload } from "./components/PhotoUpload";
 import { VideoDisplay } from "./components/VideoDisplay";
 import { PhotoDisplay } from "./components/PhotoDisplay";
 import Image from "next/image";
+import { CustomTranscriptOverlay } from "./components/CustomTextOverlay";
 
 interface Props {
   connect?: () => void | Promise<void>;
@@ -46,7 +48,6 @@ export const ClientApp: React.FC<Props> = ({
   const client = usePipecatClient();
 
   const { isDisconnected } = usePipecatConnectionState();
-  const { isCamEnabled } = usePipecatClientCamControl();
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -133,35 +134,30 @@ export const ClientApp: React.FC<Props> = ({
   }
 
   return (
-    <div
-      className="min-h-screen bg-gray-50 dark:bg-gray-900"
-      style={
-        {
-          "--controls-height": "144px",
-          "--header-height": "97px",
-        } as React.CSSProperties
-      }
-    >
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-semibold text-gray-900">
                 Daily Diary 📔
               </h1>
             </div>
             {!hasDisconnected && (
               <div className="flex items-center gap-4">
-                <ConnectButton
-                  onConnect={handleConnect}
-                  onDisconnect={handleDisconnect}
-                />
                 <Button
-                  variant={showLogs ? "primary" : "outline"}
-                  onClick={handleToggleLogs}
-                  title={showLogs ? "Hide logs" : "Show logs"}
+                  variant="outline"
+                  onClick={handleDisconnect}
+                  className="px-6 py-2 text-gray-900 border-gray-300 hover:bg-gray-50"
                 >
-                  <Logs />
+                  Disconnect
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleToggleLogs}
+                  className="px-4 py-2 text-gray-900 border-gray-300 hover:bg-gray-50"
+                >
+                  Log
                 </Button>
               </div>
             )}
@@ -170,9 +166,9 @@ export const ClientApp: React.FC<Props> = ({
       </header>
 
       {hasDisconnected ? (
-        <main className="relative max-w-7xl mx-auto mt-8 px-4 h-[calc(100vh-var(--header-height))] overflow-hidden">
-          <div className="h-full flex flex-col items-center justify-center gap-4 text-center">
-            <h1 className="text-2xl font-bold">
+        <main className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">
               Disconnected. See you next time!
             </h1>
             <Button onClick={() => window.location.reload()}>
@@ -181,29 +177,57 @@ export const ClientApp: React.FC<Props> = ({
           </div>
         </main>
       ) : (
-        <main className="relative max-w-7xl mx-auto mt-8 px-4 h-[calc(100vh-var(--header-height)-var(--controls-height))] overflow-hidden">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel
-              defaultSize={30}
-              minSize={20}
-              className={cn("min-h-0", { hidden: !showLogs })}
-            >
-              <EventStreamPanel />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2">
-            <Card>
-              <CardContent className="flex items-center justify-center gap-2">
-                <UserAudioControl visualizerProps={{ barCount: 5 }} />
-                <UserVideoControl noVideo />
-                {!isMobile && <UserScreenControl noScreen />}
-                <PhotoUpload
-                  onUpload={handlePhotoUpload}
-                  onUploadComplete={handleUploadComplete}
-                  roomId={roomId}
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          {/* Main Transcript Area */}
+          <div className="flex items-center justify-center min-h-[400px] mb-8">
+            <div className="relative w-full">
+              {/* Connection Status Indicator */}
+              {!hasDisconnected && (
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              )}
+
+              {/* Transcript Box */}
+              <div className="border border-gray-300 rounded-lg p-6 pl-12 bg-white min-h-[120px] flex items-center">
+                <CustomTranscriptOverlay
+                  participant="remote"
+                  className="w-full text-left pl-6"
+                  size="lg"
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Components - Collapsible Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Controls Panel */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <UserAudioControl visualizerProps={{ barCount: 5 }} />
+                    <PhotoUpload
+                      onUpload={handlePhotoUpload}
+                      onUploadComplete={handleUploadComplete}
+                      roomId={roomId}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Event Logs Panel */}
+              {showLogs && (
+                <Card>
+                  <CardContent className="p-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">
+                      Event Logs
+                    </h3>
+                    <div className="h-32 overflow-auto">
+                      <EventStreamPanel />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </main>
       )}
