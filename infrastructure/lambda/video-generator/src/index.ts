@@ -27,10 +27,12 @@ interface VideoGenerationResponse {
   requestId?: string;
 }
 
-async function generateVideo(generatedImages: string[], outputPath: string) {
+async function generateVideo(generatedImages: string[], outputPath: string, bgMusicPath?: string) {
   const fadeInDuration = 0.5;
   const fadeOutDuration = 0.5;
   const imageDuration = 3;
+  const totalVideoDuration = generatedImages.length * imageDuration;
+  const musicFadeOutDuration = 2.0; // Fade out music over last 2 seconds
 
   const filterParts: string[] = [];
   const inputParts: string[] = [];
@@ -64,19 +66,48 @@ async function generateVideo(generatedImages: string[], outputPath: string) {
     `${concatInputs}concat=n=${generatedImages.length}:v=1:a=0[out]`
   );
 
-  const ffmpegCommand = [
-    "/opt/bin/ffmpeg",
-    ...inputParts,
-    "-filter_complex",
-    `"${filterParts.join(";")}"`,
-    '-map "[out]"',
-    "-c:v libx264",
-    "-r 30",
-    "-pix_fmt yuv420p",
-    outputPath,
-  ].join(" ");
+  let ffmpegCommand: string;
+
+  if (bgMusicPath && fs.existsSync(bgMusicPath)) {
+    // Add background music input
+    inputParts.push(`-i ${bgMusicPath}`);
+    const audioIndex = generatedImages.length;
+
+    // Create audio filter: loop if needed, trim to video duration, apply fade out
+    const audioFilter = `[${audioIndex}:a]aloop=loop=-1:size=2e+09,atrim=duration=${totalVideoDuration},afade=t=out:st=${totalVideoDuration - musicFadeOutDuration}:d=${musicFadeOutDuration}[audio]`;
+    filterParts.push(audioFilter);
+
+    ffmpegCommand = [
+      "/opt/bin/ffmpeg",
+      ...inputParts,
+      "-filter_complex",
+      `"${filterParts.join(";")}"`,
+      '-map "[out]"',
+      '-map "[audio]"',
+      "-c:v libx264",
+      "-c:a aac",
+      "-r 30",
+      "-pix_fmt yuv420p",
+      outputPath,
+    ].join(" ");
+  } else {
+    // No background music, original video-only generation
+    console.log("No background music found, generating video without audio");
+    ffmpegCommand = [
+      "/opt/bin/ffmpeg",
+      ...inputParts,
+      "-filter_complex",
+      `"${filterParts.join(";")}"`,
+      '-map "[out]"',
+      "-c:v libx264",
+      "-r 30",
+      "-pix_fmt yuv420p",
+      outputPath,
+    ].join(" ");
+  }
 
   try {
+    console.log(`Executing FFmpeg command: ${ffmpegCommand}`);
     execSync(ffmpegCommand, { stdio: "inherit" });
     console.log(`Video generated successfully: ${outputPath}`);
   } catch (error) {
@@ -144,6 +175,40 @@ async function downloadImageFromS3(
   }
 }
 
+async function downloadBackgroundMusicFromS3(
+  bucketName: string,
+  outputPath: string
+): Promise<void> {
+  const s3Client = new S3Client({});
+
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: "music/bgm.mp3",
+      })
+    );
+
+    if (!response.Body) {
+      throw new Error("No background music data received from S3");
+    }
+
+    const chunks: Uint8Array[] = [];
+    const stream = response.Body as any;
+
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    const buffer = Buffer.concat(chunks);
+    fs.writeFileSync(outputPath, buffer);
+    console.log(`Background music downloaded to: ${outputPath}`);
+  } catch (error) {
+    console.error(`Error downloading background music from S3: ${error}`);
+    throw new Error(`Failed to download background music: ${error}`);
+  }
+}
+
 export const handler: Handler<
   VideoGenerationEvent,
   VideoGenerationResponse
@@ -160,6 +225,15 @@ export const handler: Handler<
     const ai = new GoogleGenAI({
       apiKey: secrets.GOOGLE_API_KEY,
     });
+
+    // Download background music
+    const bgMusicPath = path.join(tempDir, "bgm.mp3");
+    try {
+      await downloadBackgroundMusicFromS3(bucketName, bgMusicPath);
+      console.log("Background music downloaded successfully");
+    } catch (error) {
+      console.warn("Failed to download background music, proceeding without audio:", error);
+    }
 
     const generatedImages: string[] = [];
 
@@ -211,8 +285,12 @@ export const handler: Handler<
         }
       }
     }
+    
     const videoPath = path.join(tempDir, "memory_video.mp4");
-    await generateVideo(generatedImages, videoPath);
+    // Pass background music path if it exists
+    const musicPath = fs.existsSync(bgMusicPath) ? bgMusicPath : undefined;
+    await generateVideo(generatedImages, videoPath, musicPath);
+    
     const videoKey = `videos/vid_${requestId}.mp4`;
     const videoUrl = await uploadVideoToS3(videoPath, bucketName, videoKey);
     fs.rmSync(tempDir, { recursive: true, force: true });
