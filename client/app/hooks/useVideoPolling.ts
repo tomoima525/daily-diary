@@ -28,7 +28,7 @@ export const useVideoPolling = (requestId: string | null) => {
         if (data.isReady && data.videoKey) {
           // Get presigned URL for the video
           const presignedResponse = await fetch(
-            `/api/video/presigned/${data.videoKey}`
+            `/api/video/presigned?videoKey=${encodeURIComponent(data.videoKey)}`
           );
           const presignedData = await presignedResponse.json();
 
@@ -46,7 +46,7 @@ export const useVideoPolling = (requestId: string | null) => {
 
     // Start polling every 5 seconds
     const intervalId = setInterval(pollVideoGenerationStatus, 5000);
-    
+
     // Also check immediately
     pollVideoGenerationStatus();
 

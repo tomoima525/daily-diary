@@ -6,12 +6,10 @@ const s3Client = new S3Client({
   region: process.env.AWS_REGION || "us-east-1",
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ videoKey: string }> }
-) {
-  const { videoKey } = await params;
-  
+// videoKey is encoded in the URL, and also it's provided as a query parameter
+export async function GET(request: NextRequest) {
+  const videoKey = request.nextUrl.searchParams.get("videoKey");
+
   if (!videoKey) {
     return NextResponse.json(
       { error: "Video key is required" },
@@ -28,9 +26,12 @@ export async function GET(
   }
 
   try {
+    console.log("Video key:", videoKey);
+    const decodedVideoKey = decodeURIComponent(videoKey);
+    console.log("Decoded video key:", decodedVideoKey);
     const command = new GetObjectCommand({
       Bucket: bucketName,
-      Key: videoKey,
+      Key: decodedVideoKey,
     });
 
     // Generate presigned URL valid for 1 hour
