@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2025, Tomoaki Imai
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
@@ -29,7 +29,7 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import LLMMessagesAppendFrame, LLMMessagesUpdateFrame, TTSSpeakFrame
+from pipecat.frames.frames import LLMMessagesUpdateFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -64,7 +64,7 @@ You are Daily Diary, an AI assistant that helps users create beautiful memory vi
 
 Your conversation flow:
 1. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
-2. Analyze a photo. When analysis is done, ask feelings and stories about the moment. Continue this process until all photos in the queue are reviewed. 
+2. Analyze a photo. When you receive the description of the photo, say something like "I finishd analyzing." and start asking feelings and stories about the moment. Continue this process until all photos in the queue are reviewed. 
 3. When all photos are reviewed, Offer to create a memory video with their story and photo
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
@@ -72,7 +72,7 @@ Be warm, empathetic, and creative in your responses. Help users capture not just
 You have access to four tools: get_photo_name, analyze_photo, store_user_feelings, generate_video
 
 For getting a photo name from stored images, use `get_photo_name` function. It returns the name of the photo(e.g. image_0, image_1, etc.) or "No more photos in the queue. Let's generate a video." if there is no photo in the queue. Start creating a video after all photos are reviewed.
-For photo analysis, use `analyze_photo` function. It returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo. Ask feelings and stories about the moment using this description.
+For photo analysis, use `analyze_photo` function. It returns the name of the photo(e.g. image_0, image_1, etc.) and description of what's in the photo.
 For storing user's feelings about each photo, use `store_user_feelings` function.
 For generating a video, use `generate_video` function.
 """

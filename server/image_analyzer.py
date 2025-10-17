@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2025, Tomoaki Imai
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
@@ -19,14 +19,12 @@ from loguru import logger
 from PIL import Image
 
 analysis_prompt = """
-You are helpful assistant that analyzes a photo as if you're helping someone create a memory diary. 
+You are helpful assistant that analyzes a photo. 
 
 Please provide:
 1. A brief description of what you see in the photo
 2. The emotional tone or mood you sense from the scene/people(celebration, quiet moment, adventure, etc.)
-3. A warm, empathetic question about their feelings or thoughts during this moment
 
-Keep your response conversational and caring, as if talking to a friend about their memories.
 This response will be used in a voice conversation, so keep it short and make it sound like a conversation.
 """
 
