@@ -4,6 +4,7 @@ import {
   PipecatClientVideo,
   usePipecatClient,
   usePipecatClientCamControl,
+  useRTVIClientEvent,
 } from "@pipecat-ai/client-react";
 import {
   Button,
@@ -25,7 +26,7 @@ import {
   UserScreenControl,
   UserVideoControl,
 } from "@pipecat-ai/voice-ui-kit";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Logs, MonitorOff } from "lucide-react";
 import { EventStreamPanel } from "./EventStreamPanel";
 import { PhotoUpload } from "./components/PhotoUpload";
@@ -33,6 +34,7 @@ import { VideoDisplay } from "./components/VideoDisplay";
 import { PhotoDisplay } from "./components/PhotoDisplay";
 import Image from "next/image";
 import { CustomTranscriptOverlay } from "./components/CustomTextOverlay";
+import { RTVIEvent, ServerMessageData } from "@pipecat-ai/client-js";
 
 interface Props {
   connect?: () => void | Promise<void>;
@@ -50,12 +52,30 @@ export const ClientApp: React.FC<Props> = ({
   const { isDisconnected } = usePipecatConnectionState();
 
   const [hasDisconnected, setHasDisconnected] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [uploadedPhotos, setUploadedPhotos] = useState<
     Array<{ filename: string; url: string }>
   >([]);
 
+  useRTVIClientEvent(
+    RTVIEvent.ServerMessage,
+    useCallback((event: ServerMessageData) => {
+      console.log("Server message received:", event);
+      if (
+        event.data?.type === "video_generation_started" &&
+        event.data?.payload?.request_id
+      ) {
+        // Start polling for video generation status
+        const requestId = event.data?.payload?.request_id;
+        const pollVideoGenerationStatus = async () => {
+          const response = await fetch(`/api/video/${requestId}`);
+          const data = await response.json();
+          console.log("Video generation status:", data);
+        };
+        setInterval(pollVideoGenerationStatus, 5000);
+      }
+    }, [])
+  );
   useEffect(() => {
     if (hasDisconnected) return;
     if (client && isDisconnected) {
