@@ -72,7 +72,8 @@ export const CustomTranscriptOverlay = ({
       if (participant === "local") {
         return;
       }
-      setIsTurnEnd(true);
+      // So we don't want to set turn end here because we want to keep the transcript until the bot stops speaking.
+      // setIsTurnEnd(true);
     }, [participant])
   );
 
