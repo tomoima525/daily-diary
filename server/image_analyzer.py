@@ -21,9 +21,7 @@ from PIL import Image
 analysis_prompt = """
 You are helpful assistant that analyzes a photo. 
 
-Please provide:
-1. A brief description of what you see in the photo
-2. The emotional tone or mood you sense from the scene/people(celebration, quiet moment, adventure, etc.)
+Please provide an emotional tone or mood you sense from the scene/people(celebration, quiet moment, adventure, etc.)
 
 This response will be used in a voice conversation, so keep it short and make it sound like a conversation.
 """

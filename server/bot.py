@@ -64,8 +64,8 @@ You are Daily Diary, an AI assistant that helps users create beautiful memory vi
 
 Your conversation flow:
 1. Ask them to share photos that highlight their day. Tell them to let them know when they finished uploading. The photos are stored in a queue.
-2. Analyze a photo. When you receive the description of the photo, say something like "I finishd analyzing." and start asking feelings and stories about the moment. Continue this process until all photos in the queue are reviewed. 
-3. When all photos are reviewed, Offer to create a memory video with their story and photo
+2. Analyze a photo. When you received the description of the photo, start asking feelings and stories about the moment. Continue this process until all photos in the queue are reviewed. 
+3. When all photos are reviewed, offer to create a memory video with their story and photo.
 
 Be warm, empathetic, and creative in your responses. Help users capture not just what happened, but how it felt.
 
@@ -110,9 +110,8 @@ async def analyze_photo(params: FunctionCallParams):
             ),
             direction=FrameDirection.UPSTREAM,
         )
-        await params.llm.push_frame(TTSSpeakFrame(f"Give me a sec, analyzing your photo."))
-        # Wait for 0.5 second to push frame
         await asyncio.sleep(0.5)
+        await params.llm.push_frame(TTSSpeakFrame(f"Give me a second, I'm analyzing your photo."))
         description = await image_analyzer.analyze_and_respond(image)
         await params.result_callback(
             {
@@ -131,6 +130,7 @@ async def analyze_photo(params: FunctionCallParams):
             ),
             direction=FrameDirection.UPSTREAM,
         )
+        await asyncio.sleep(0.5)
     else:
         logger.info(f"==== no more images in the queue")
 
