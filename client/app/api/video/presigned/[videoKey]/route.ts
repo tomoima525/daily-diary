@@ -8,9 +8,9 @@ const s3Client = new S3Client({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { videoKey: string } }
+  { params }: { params: Promise<{ videoKey: string }> }
 ) {
-  const { videoKey } = params;
+  const { videoKey } = await params;
   
   if (!videoKey) {
     return NextResponse.json(

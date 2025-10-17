@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
-  const { requestId } = params;
+  const { requestId } = await params;
   
   if (!requestId) {
     return NextResponse.json(
