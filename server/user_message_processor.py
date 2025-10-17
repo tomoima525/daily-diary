@@ -42,35 +42,6 @@ class ReceiveUserMessageProcessor(FrameProcessor):
         if isinstance(frame, RTVIClientMessageFrame):
             # Check if this is a photo upload message
             if isinstance(frame.data, dict) and frame.data.get("type") == "photo_upload":
-                # An example to send message to LLM
-                # # LLMMessagesAppendFrame
-                # await self.push_frame(
-                #     LLMMessagesAppendFrame(
-                #         messages=[
-                #             {
-                #                 "role": "system",
-                #                 "content": "Ask user if you want to upload more photo",
-                #             }
-                #         ],
-                #         run_llm=True,
-                #     ),
-                #     direction=FrameDirection.UPSTREAM,
-                # )
-                # context = OpenAILLMContext(
-                #     messages=[
-                #         {
-                #             "role": "system",
-                #             "content": "",
-                #         }
-                #     ],
-                # )
-                # await self.push_frame(
-                #     OpenAILLMContextFrame(
-                #         run_llm=True,
-                #     ),
-                #     direction=FrameDirection.UPSTREAM,
-                # )
-
                 file_url = frame.data.get("file_url")
                 if file_url:
                     await self._handle_photo_download(file_url)
@@ -90,16 +61,16 @@ class ReceiveUserMessageProcessor(FrameProcessor):
             if image:
                 # Add to photo storage with deduplication
                 photo_name, is_new = await self._photo_storage.add_photo(
-                    image=image,
-                    file_path=file_key,
-                    original_file_key=file_key
+                    image=image, file_path=file_key, original_file_key=file_key
                 )
-                
+
                 if is_new:
-                    logger.info(f"Successfully processed new photo: {photo_name} from {file_key} ({image.size})")
+                    logger.info(
+                        f"Successfully processed new photo: {photo_name} from {file_key} ({image.size})"
+                    )
                 else:
                     logger.info(f"Photo already exists as: {photo_name} from {file_key}")
-                    
+
                 return photo_name
             else:
                 logger.error(f"Failed to download photo: {file_key}")
