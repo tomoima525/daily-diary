@@ -15,7 +15,7 @@ export function LandingPage({ onConnect, onDisconnect }: LandingPageProps) {
           Daily Diary 📔
         </h1>
         <p className="text-xl text-gray-700 mb-12">
-          Talk and preserve your memorable moment ✨
+          Talk, and your day turns into a memory movie✨
         </p>
         <div className="flex justify-center">
           <ConnectButton onConnect={onConnect} onDisconnect={onDisconnect} />
