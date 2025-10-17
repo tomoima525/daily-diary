@@ -18,6 +18,7 @@ export const useVideoPolling = (requestId: string | null) => {
 
     setIsPolling(true);
     setError(null);
+    let intervalId: NodeJS.Timeout | null = null;
 
     const pollVideoGenerationStatus = async () => {
       try {
@@ -35,33 +36,40 @@ export const useVideoPolling = (requestId: string | null) => {
           if (presignedData.presignedUrl) {
             setVideoUrl(presignedData.presignedUrl);
             setIsPolling(false);
+            
+            // CRITICAL FIX: Clear the interval when video is ready
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
           }
         }
       } catch (error) {
         console.error("Error polling video status:", error);
         setError(error instanceof Error ? error.message : "Unknown error");
         setIsPolling(false);
+        
+        // Clear interval on error too
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
       }
     };
 
     // Start polling every 5 seconds
-    const intervalId = setInterval(pollVideoGenerationStatus, 5000);
+    intervalId = setInterval(pollVideoGenerationStatus, 5000);
 
     // Also check immediately
-    if (isPolling) {
-      pollVideoGenerationStatus();
-    } else {
-      setIsPolling(false);
-      setVideoUrl(null);
-      setError(null);
-      clearInterval(intervalId);
-    }
-
+    pollVideoGenerationStatus();
+    
     // Cleanup function
     return () => {
-      clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
-  }, [requestId, isPolling]);
+  }, [requestId]); // REMOVED isPolling dependency to prevent infinite re-renders
 
   return { videoUrl, isPolling, error };
 };
