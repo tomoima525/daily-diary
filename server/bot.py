@@ -17,8 +17,10 @@ The bot runs as part of a pipeline that processes audio/video frames and manages
 the conversation flow using Gemini's streaming capabilities.
 """
 
+import json
 import os
 
+import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
@@ -38,6 +40,7 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIConfig,
     RTVIObserver,
     RTVIProcessor,
+    RTVIServerMessageFrame,
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -95,9 +98,7 @@ async def analyze_photo(params: FunctionCallParams):
 
     if image:
         logger.info(f"==== analyzing photo {photo_name} with size {image.size}")
-        await params.llm.push_frame(
-            TTSSpeakFrame(f"Give me a sec, analyzing photo {photo_name}...")
-        )
+        await params.llm.push_frame(TTSSpeakFrame(f"Give me a sec, analyzing your photo"))
         description = await image_analyzer.analyze_and_respond(image)
         logger.info(f"==== description {description}")
         await params.result_callback(
@@ -148,6 +149,29 @@ async def store_user_feelings(params: FunctionCallParams):
         )
 
 
+def build_photo_memories_payload():
+    """Build photo memories payload for Lambda API."""
+    all_photos = photo_storage.get_all_photos()
+    photo_memories = []
+
+    for photo_name, photo_data in all_photos.items():
+        # Get the most recent feeling for this photo
+        feelings_list = photo_data.get("feelings", [])
+        feelings_text = ""
+        if feelings_list:
+            # Use the most recent feeling
+            latest_feeling = feelings_list[-1]["feeling"]
+            feelings_text = latest_feeling
+
+        # Use S3 path for photo_url (photos/{photo_name}.jpg)
+        photo_url = photo_data.get("original_file_key")
+
+        photo_memory = {"photo_name": photo_name, "photo_url": photo_url, "feelings": feelings_text}
+        photo_memories.append(photo_memory)
+
+    return {"photo_memories": photo_memories}
+
+
 async def generate_video(params: FunctionCallParams):
     """Generate a memory video from stored photos and feelings."""
     stats = photo_storage.get_stats()
@@ -162,15 +186,73 @@ async def generate_video(params: FunctionCallParams):
         )
     )
 
-    # TODO: Implement actual video generation logic
-    # For now, return a placeholder response
-    await params.result_callback(
-        {
-            "status": "success",
-            "message": f"Memory video generated with {stats['total_photos']} photos",
-            "video_url": "https://placeholder-video-url.com/memory_video.mp4",
-        }
-    )
+    # Get the VIDEO_API_URL from environment
+    video_api_url = os.getenv("VIDEO_API_URL")
+    if not video_api_url:
+        logger.error("VIDEO_API_URL environment variable not set")
+        await params.result_callback(
+            {
+                "status": "error",
+                "message": "Video API configuration missing",
+                "video_url": None,
+            }
+        )
+        return
+
+    # Build the photo memories payload
+    payload = build_photo_memories_payload()
+    logger.info(f"==== Sending payload to Lambda: {json.dumps(payload, indent=2)}")
+
+    try:
+        # Make async HTTP POST request to Lambda API
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{video_api_url.rstrip('/')}/video",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    request_id = result.get("requestId")
+                    logger.info(f"==== Video generation started with requestId: {request_id}")
+                    # Send ServerMessageFrame to the client
+                    await params.llm.push_frame(
+                        RTVIServerMessageFrame(
+                            data={
+                                "type": "video_generation_started",
+                                "payload": {
+                                    "request_id": request_id,
+                                },
+                            }
+                        )
+                    )
+
+                    await params.result_callback(
+                        {
+                            "status": "success",
+                            "message": f"Memory video generation started! Your video will be ready shortly.",
+                            "request_id": request_id,
+                        }
+                    )
+                else:
+                    error_text = await response.text()
+                    logger.error(f"==== Lambda API error: {response.status} - {error_text}")
+                    await params.result_callback(
+                        {
+                            "status": "error",
+                            "message": "Failed to start video generation",
+                            "video_url": None,
+                        }
+                    )
+    except Exception as e:
+        logger.error(f"==== Error calling Lambda API: {str(e)}")
+        await params.result_callback(
+            {
+                "status": "error",
+                "message": f"Video generation failed: {str(e)}",
+                "video_url": None,
+            }
+        )
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):

@@ -8,7 +8,8 @@ dependencies = [
     "pipecatcloud>=0.2.6",
     "google-generativeai",
     "boto3>=1.40.0",
-    "pillow>=10.0.0"
+    "pillow>=10.0.0",
+    "aiohttp>=3.8.0"
 ]
 
 [dependency-groups]
