@@ -23,42 +23,32 @@ https://github.com/user-attachments/assets/9bb700e0-71cf-4100-bad6-d76fea995db8
 ## How Gemini models and Pipecat used
 
 **Gemini Integration:**
-- **Gemini 2.5 gemini-2.5-flash** for real-time voice conversations via Pipecat's Gemini Live integration
+- **Gemini 2.5 gemini-2.5-flash** for real-time voice conversations via Pipecat's Gemini integration
 - **Gemini 2.5 gemini-2.5-flash-image** for intelligent photo analysis, generating empathetic responses about user memories
 - Custom prompts designed for emotional understanding and memory exploration
 
 **Pipecat Integration:**
 - Real-time WebRTC voice communication through Daily.co transport
 - Custom pipeline handling photo uploads and analysis results
-- Voice UI Kit components for polished user experience
+- **Voice UI Kit** components for polished user experience
 
 ## Other tools used
 
-- **AWS S3**: Secure photo storage with presigned URL uploads
+- **AWS S3, Lambda**: Secure photo storage with presigned URL uploads, video generation
 - **Daily.co**: WebRTC infrastructure for real-time communication
 
 ## What we built new during the hackathon
 
-**New Features Added:**
-1. **Photo Upload Component** (`client/app/components/PhotoUpload.tsx`) - S3 integration with drag-and-drop interface
-2. **Photo Display Component** (`client/app/components/PhotoDisplay.tsx`) - Shows uploaded photos alongside conversation
-3. **Image Analysis Module** (`server/image_analyzer.py`) - Gemini-powered photo analysis for emotional understanding
-4. **S3 Manager** (`server/s3_manager.py`) - Handles secure photo storage and retrieval
-5. **Upload API** (`client/app/api/upload/route.ts`) - Generates presigned URLs for secure uploads
-6. **Memory-focused prompts** - Custom AI prompts designed for empathetic memory exploration
-
-**Built on top of:** The base Pipecat + Gemini Live integration example, adding photo analysis and memory conversation capabilities.
-
 ## Feedback on tools used
 
-**Gemini Live API:**
+**Gemini:**
 - **Excellent**: Natural conversation flow with minimal latency
 - **Great**: Easy integration with Pipecat's existing infrastructure
-- **Suggestion**: More examples of custom prompt engineering for specific use cases
+- **Suggestion**: More examples of custom prompt engineering for specific use cases. `Role` is different from other models (Gemini only has "Model", "User") which was a bit confusing.
 
 **Pipecat:**
-- **Loved**: Voice UI Kit components saved significant development time
-- **Challenge**: Handling Conversation Frame was complicated and I was not able to complete it 
+- **Loved**: Voice UI Kit components saved significant development time!
+- **Challenge**: While Pipecat is super flexible and has many ways to achieve something, I often was not sure what's the best way. For instance, when handling a frame, there is `push_frame` and `queue_frame`. I wasn't quite sure what's the difference between these two functions and I wish there were a good example that illustrates the behavior.  
 
 ## Project structure
 
