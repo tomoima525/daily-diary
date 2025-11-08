@@ -739,7 +739,7 @@ dependencies = [
     { name = "boto3" },
     { name = "google-generativeai" },
     { name = "pillow" },
-    { name = "pipecat-ai", extra = ["cartesia", "daily", "deepgram", "google", "local-smart-turn-v3", "runner", "silero", "webrtc"] },
+    { name = "pipecat-ai", extra = ["cartesia", "daily", "deepgram", "google", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc"] },
     { name = "pipecatcloud" },
 ]
 
@@ -754,7 +754,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.40.0" },
     { name = "google-generativeai" },
     { name = "pillow", specifier = ">=10.0.0" },
-    { name = "pipecat-ai", extras = ["webrtc", "daily", "silero", "google", "cartesia", "deepgram", "local-smart-turn-v3", "runner"], specifier = ">=0.0.90" },
+    { name = "pipecat-ai", extras = ["webrtc", "daily", "silero", "openai", "google", "cartesia", "deepgram", "local-smart-turn-v3", "runner"], specifier = ">=0.0.90" },
     { name = "pipecatcloud", specifier = ">=0.2.6" },
 ]
 
@@ -1762,6 +1762,9 @@ google = [
 local-smart-turn-v3 = [
     { name = "onnxruntime" },
     { name = "transformers" },
+]
+openai = [
+    { name = "websockets" },
 ]
 runner = [
     { name = "fastapi" },

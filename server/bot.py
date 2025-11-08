@@ -46,9 +46,9 @@ from pipecat.processors.frameworks.rtvi import (
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -275,7 +275,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     - RTVI event handling
     """
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramFluxSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
@@ -382,12 +382,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await rtvi.set_bot_ready()
         # Start the conversation
         # Kick off the conversation with a styled introduction
-        # messages.append(
-        #     {
-        #         "role": "system",
-        #         "content": "Start the conversation with introduction",
-        #     }
-        # )
+        messages.append(
+            {
+                "role": "system",
+                "content": "Start the conversation with introduction",
+            }
+        )
         await task.queue_frames(
             [
                 LLMMessagesUpdateFrame(
