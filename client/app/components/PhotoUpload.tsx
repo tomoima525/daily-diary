@@ -12,11 +12,9 @@ interface PhotoUploadProps {
 
 export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       console.error("Please select an image file");
@@ -33,7 +31,7 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           filename: file.name,
           contentType: file.type,
           roomId: roomId
@@ -61,7 +59,7 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
 
       console.log(`File uploaded successfully: ${key}`);
       onUpload(fileUrl, file.name);
-      
+
       // Notify agent that upload is complete
       if (onUploadComplete) {
         onUploadComplete(key);
@@ -74,6 +72,52 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Upload files sequentially
+    for (let i = 0; i < files.length; i++) {
+      await uploadFile(files[i]);
+    }
+
+    // Reset the input value to allow uploading the same file again
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+
+    // Filter for image files only
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) {
+      console.error("No image files found in drop");
+      return;
+    }
+
+    // Upload files sequentially
+    for (const file of imageFiles) {
+      await uploadFile(file);
+    }
+  };
+
   const handleButtonClick = () => {
     if (!uploading) {
       const input = document.getElementById('photo-upload') as HTMLInputElement;
@@ -83,18 +127,37 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
 
   return (
     <div className="relative">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-        id="photo-upload"
-        disabled={uploading}
-      />
-      <Button onClick={handleButtonClick} disabled={uploading}>
-        <Upload className="w-4 h-4 mr-2" />
-        {uploading ? "Uploading..." : "Upload Photo"}
-      </Button>
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`
+          relative transition-all duration-200 rounded-lg
+          ${isDragging
+            ? 'bg-blue-500/10 border-2 border-blue-500 border-dashed p-4'
+            : 'border-2 border-transparent'
+          }
+        `}
+      >
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+          id="photo-upload"
+          disabled={uploading}
+        />
+        <Button onClick={handleButtonClick} disabled={uploading}>
+          <Upload className="w-4 h-4 mr-2" />
+          {uploading ? "Uploading..." : "Upload Photo"}
+        </Button>
+        {isDragging && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <p className="text-blue-500 font-medium">Drop images here</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
