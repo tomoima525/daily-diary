@@ -4,17 +4,17 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Gemini Bot Implementation.
+"""Daily Diary Bot Implementation.
 
-This module implements a chatbot using Google's Gemini Multimodal Live model.
+This module implements a chatbot using OpenAI's LLM service.
 It includes:
 
 - Real-time audio/video interaction
-- Screen sharing analysis for location guessing
+- Photo analysis and memory capture
 - Speech-to-speech model with visual reasoning
 
 The bot runs as part of a pipeline that processes audio/video frames and manages
-the conversation flow using Gemini's streaming capabilities.
+the conversation flow using OpenAI's streaming capabilities.
 """
 
 import asyncio
@@ -46,9 +46,9 @@ from pipecat.processors.frameworks.rtvi import (
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -270,19 +270,19 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
-    - Gemini model integration
+    - OpenAI LLM integration
     - Voice activity detection
     - RTVI event handling
     """
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramFluxSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         voice_id="cd17ff2d-5ea4-4695-be8f-42193949b946",  # Meditation lady
     )
 
-    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-2.5-flash")
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
     # Function calls
     get_photo_name_function = FunctionSchema(
@@ -382,12 +382,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await rtvi.set_bot_ready()
         # Start the conversation
         # Kick off the conversation with a styled introduction
-        # messages.append(
-        #     {
-        #         "role": "system",
-        #         "content": "Start the conversation with introduction",
-        #     }
-        # )
+        messages.append(
+            {
+                "role": "system",
+                "content": "Start the conversation with introduction",
+            }
+        )
         await task.queue_frames(
             [
                 LLMMessagesUpdateFrame(
