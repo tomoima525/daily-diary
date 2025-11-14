@@ -292,18 +292,18 @@ export const ClientApp: React.FC<Props> = ({
                 <h3 className="text-sm font-medium text-gray-700 mb-4">
                   Uploaded Photos:
                 </h3>
-                <div className="space-y-4 grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {uploadedPhotos.map((photo, index) => {
                     const isAnalyzing = analyzingPhotoIndexes.has(index);
 
                     return (
                       <div
                         key={index}
-                        className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg bg-gray-50"
+                        className="flex flex-col items-center gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50"
                       >
                         <PhotoDisplay photoUrl={photo.url} />
-                        <div className="flex flex-col gap-2">
-                          <p className="text-sm font-medium text-gray-900">
+                        <div className="flex flex-col gap-2 items-center w-full">
+                          <p className="text-sm font-medium text-gray-900 text-center truncate w-full px-2">
                             {photo.filename}
                           </p>
                           {isAnalyzing && (

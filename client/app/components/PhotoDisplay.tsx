@@ -26,14 +26,14 @@ export function PhotoDisplay({ photoUrl, onClear }: PhotoDisplayProps) {
 
   return (
     <>
-      <div className="w-[120px]">
+      <div className="w-full max-w-[200px]">
         <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden">
           {!hasError ? (
             <Image
               src={photoUrl}
               alt="Uploaded photo"
               fill
-              sizes="100vw"
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
               className={`object-cover transition-opacity duration-200 ${
                 isLoaded ? "opacity-100" : "opacity-0"
               }`}
