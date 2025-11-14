@@ -126,16 +126,18 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
   };
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`
-          relative transition-all duration-200 rounded-lg
+          relative transition-all duration-200 rounded-lg p-8
+          border-2 border-dashed
+          flex flex-col items-center justify-center gap-3
           ${isDragging
-            ? 'bg-blue-500/10 border-2 border-blue-500 border-dashed p-4'
-            : 'border-2 border-transparent'
+            ? 'bg-blue-500/20 border-blue-500 scale-[1.02]'
+            : 'bg-gray-500/5 border-gray-300 hover:border-blue-400 hover:bg-blue-500/5'
           }
         `}
       >
@@ -148,15 +150,20 @@ export function PhotoUpload({ onUpload, onUploadComplete, roomId }: PhotoUploadP
           id="photo-upload"
           disabled={uploading}
         />
+
+        <Upload className={`w-8 h-8 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+
+        <div className="text-center">
+          <p className={`text-sm font-medium mb-1 ${isDragging ? 'text-blue-500' : 'text-gray-700'}`}>
+            {isDragging ? 'Drop images here!' : 'Drag & drop images here'}
+          </p>
+          <p className="text-xs text-gray-500">or</p>
+        </div>
+
         <Button onClick={handleButtonClick} disabled={uploading}>
           <Upload className="w-4 h-4 mr-2" />
-          {uploading ? "Uploading..." : "Upload Photo"}
+          {uploading ? "Uploading..." : "Browse Files"}
         </Button>
-        {isDragging && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-blue-500 font-medium">Drop images here</p>
-          </div>
-        )}
       </div>
     </div>
   );
